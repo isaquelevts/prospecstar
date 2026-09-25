@@ -1,0 +1,40 @@
+{
+  "name": "prospeccao",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:worker": "tsx watch --env-file=.env src/worker/index.ts",
+    "build": "prisma generate && next build",
+    "start": "next start -p 3000",
+    "worker": "tsx src/worker/index.ts",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "tsx --env-file=.env prisma/seed.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openai/agents": "^0.18.0",
+    "@prisma/client": "^6.19.3",
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.4.0",
+    "jose": "^5.9.0",
+    "next": "^15.5.26",
+    "openai": "^7.23.0",
+    "papaparse": "^5.4.1",
+    "prisma": "^6.19.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "swr": "^2.3.0",
+    "tsx": "^4.19.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.0.0",
+    "@types/papaparse": "^5.3.15",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.7.0"
+  }
+}

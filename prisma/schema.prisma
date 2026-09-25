@@ -1,0 +1,206 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Configurações editáveis pela interface (chaves de API etc). Env vars servem de fallback.
+model Setting {
+  key   String @id
+  value String
+}
+
+model Stage {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  order  Int     @default(0)
+  color  String  @default("#64748b")
+  isWon  Boolean @default(false)
+  isLost Boolean @default(false)
+  leads  Lead[]
+}
+
+model Lead {
+  id            String    @id @default(cuid())
+  name          String
+  phone         String?   @unique // apenas dígitos, com DDI (ex: 5511999998888)
+  chatId        String?   @unique // id do chat no WhatsApp (xxx@c.us ou xxx@lid)
+  waExists      Boolean? // null = não verificado
+  email         String?
+  website       String?
+  websiteStatus String? // NONE | SOCIAL_ONLY | OFFLINE | NO_HTTPS | NOT_MOBILE | OK
+  websiteInfo   Json?
+  address       String?
+  city          String?
+  state         String?
+  category      String?
+  rating        Float?
+  reviewsCount  Int?
+  mapsUrl       String?
+  source        String    @default("manual") // apify | google_places | csv | whatsapp | manual
+  externalId    String?   @unique // placeId etc, para deduplicar
+  score         Int       @default(0)
+  tags          String[]  @default([])
+  notes         String?
+  customData    Json      @default("{}")
+  stageId       String?
+  stage         Stage?    @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  aiEnabled     Boolean   @default(false)
+  agentId       String?
+  agent         Agent?    @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  optOut        Boolean   @default(false)
+  unread        Int       @default(0)
+  lastInboundAt  DateTime?
+  lastOutboundAt DateTime?
+  lastMessageAt  DateTime?
+  scrapeJobId   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  messages        Message[]
+  activities      Activity[]
+  campaignTargets CampaignTarget[]
+  flowRuns        FlowRun[]
+
+  @@index([stageId])
+  @@index([lastMessageAt])
+  @@index([createdAt])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  direction String // IN | OUT
+  body      String
+  wahaId    String?  @unique
+  author    String   @default("human") // contact | human | ai | campaign | flow
+  status    String   @default("sent") // pending | sent | failed | received
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([leadId, createdAt])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type      String // note | stage | tag | ai | campaign | flow | system
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([leadId, createdAt])
+}
+
+model ScrapeJob {
+  id            String   @id @default(cuid())
+  provider      String // apify_maps | apify_custom | google_places
+  query         String
+  input         Json
+  status        String   @default("PENDING") // PENDING | RUNNING | IMPORTING | DONE | FAILED
+  runId         String?
+  datasetId     String?
+  itemsFound    Int      @default(0)
+  itemsImported Int      @default(0)
+  itemsSkipped  Int      @default(0)
+  tags          String[] @default([])
+  error         String?
+  createdAt     DateTime @default(now())
+  finishedAt    DateTime?
+}
+
+model Agent {
+  id              String   @id @default(cuid())
+  name            String
+  enabled         Boolean  @default(true)
+  isDefault       Boolean  @default(false)
+  model           String   @default("gpt-5-mini")
+  effort          String   @default("low")
+  systemPrompt    String
+  knowledge       String   @default("")
+  debounceSec     Int      @default(20)
+  historyLimit    Int      @default(30)
+  splitMessages   Boolean  @default(true)
+  canMoveStage    Boolean  @default(true)
+  canTag          Boolean  @default(true)
+  canHandoff      Boolean  @default(true)
+  canSaveInfo     Boolean  @default(true)
+  handoffWebhook  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  leads           Lead[]
+  campaigns       Campaign[]
+}
+
+model Campaign {
+  id            String    @id @default(cuid())
+  name          String
+  status        String    @default("DRAFT") // DRAFT | RUNNING | PAUSED | DONE
+  session       String    @default("default")
+  templates     String[] // variações; suporta spintax {a|b} e variáveis {{nome}}
+  filter        Json      @default("{}")
+  minDelaySec   Int       @default(60)
+  maxDelaySec   Int       @default(180)
+  dailyLimit    Int       @default(40)
+  windowStart   String    @default("09:00")
+  windowEnd     String    @default("18:00")
+  weekdays      Int[]     @default([1, 2, 3, 4, 5])
+  agentId       String?
+  agent         Agent?    @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  moveToStageId String?
+  tickToken     String?
+  createdAt     DateTime  @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  targets       CampaignTarget[]
+}
+
+model CampaignTarget {
+  id         String    @id @default(cuid())
+  campaignId String
+  campaign   Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  leadId     String
+  lead       Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status     String    @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  message    String?
+  error      String?
+  sentAt     DateTime?
+  repliedAt  DateTime?
+
+  @@unique([campaignId, leadId])
+  @@index([campaignId, status])
+}
+
+model Flow {
+  id            String    @id @default(cuid())
+  name          String
+  active        Boolean   @default(false)
+  trigger       String // LEAD_CREATED | MESSAGE_RECEIVED | STAGE_CHANGED | TAG_ADDED | NO_REPLY | MANUAL
+  triggerConfig Json      @default("{}")
+  steps         Json      @default("[]")
+  stopOnReply   Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  runs          FlowRun[]
+}
+
+model FlowRun {
+  id        String    @id @default(cuid())
+  flowId    String
+  flow      Flow      @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  leadId    String
+  lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  stepIndex Int       @default(0)
+  status    String    @default("RUNNING") // RUNNING | WAITING | DONE | STOPPED | FAILED
+  nextRunAt DateTime?
+  log       Json      @default("[]")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([flowId, leadId])
+  @@index([status])
+}
