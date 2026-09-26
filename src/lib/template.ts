@@ -15,10 +15,11 @@ export function leadVariables(lead: Partial<Lead>): Record<string, string> {
     avaliacao: lead.rating?.toString().replace(".", ",") ?? "",
     avaliacoes: lead.reviewsCount?.toString() ?? "",
     saudacao: hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite",
+    saudacao_informal: pick(["Oi", "Olá", "Opa"]),
   };
 }
 
-export const TEMPLATE_VARIABLES = ["nome", "primeiro_nome", "cidade", "categoria", "site", "avaliacao", "avaliacoes", "saudacao"];
+export const TEMPLATE_VARIABLES = ["nome", "primeiro_nome", "cidade", "categoria", "site", "avaliacao", "avaliacoes", "saudacao", "saudacao_informal"];
 
 /** Substitui {{variavel}} e resolve spintax {opção a|opção b|opção c}. */
 export function renderTemplate(template: string, vars: Record<string, string>) {
