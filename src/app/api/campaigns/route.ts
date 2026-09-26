@@ -13,6 +13,7 @@ export const GET = route(async () => {
       ...c,
       stats: {
         pending: s.PENDING ?? 0,
+        sending: s.SENDING ?? 0,
         sent: s.SENT ?? 0,
         failed: s.FAILED ?? 0,
         skipped: s.SKIPPED ?? 0,

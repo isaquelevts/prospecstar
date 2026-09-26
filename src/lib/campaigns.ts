@@ -78,6 +78,13 @@ export async function campaignTick(campaignId: string, token: string) {
     return;
   }
 
+  // Atomically claim the target so the UI cannot remove it after sending starts.
+  const claimed = await prisma.campaignTarget.updateMany({
+    where: { id: target.id, status: "PENDING" },
+    data: { status: "SENDING" },
+  });
+  if (claimed.count === 0) return next(1000);
+
   const lead = target.lead;
   if (lead.optOut || !lead.phone || lead.waExists === false) {
     await prisma.campaignTarget.update({ where: { id: target.id }, data: { status: "SKIPPED", error: "opt-out ou sem WhatsApp" } });

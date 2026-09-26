@@ -103,11 +103,9 @@ function worker<T>(name: string, fn: (job: Job<T>) => Promise<unknown>, concurre
   return w;
 }
 
-const workers = [
+const workers: Worker[] = [
   worker(QUEUES.scrape, processScrape, 2),
   worker(QUEUES.enrich, processEnrich, 8),
-  // concorrência 1: os disparos de todas as campanhas saem em fila única, nunca em paralelo
-  worker<{ campaignId: string; token: string }>(QUEUES.campaign, (j) => campaignTick(j.data.campaignId, j.data.token), 1),
   worker<{ leadId: string }>(QUEUES.ai, (j) => replyToLead(j.data.leadId), 4),
   worker<{ runId: string }>(QUEUES.flow, (j) => executeRun(j.data.runId), 4),
   worker(QUEUES.cron, async (j) => {
@@ -116,6 +114,17 @@ const workers = [
 ];
 
 async function main() {
+  // Restore claims interrupted by a worker restart before consuming campaign jobs.
+  await prisma.campaignTarget.updateMany({ where: { status: "SENDING" }, data: { status: "PENDING" } });
+  const campaignQueue = queue("campaign");
+  const queued = await campaignQueue.getJobs(["active", "waiting", "delayed", "paused"], 0, -1);
+  const queuedCampaigns = new Set(queued.map((j) => `${j.data.campaignId}:${j.data.token}`));
+  const running = await prisma.campaign.findMany({ where: { status: "RUNNING", tickToken: { not: null } }, select: { id: true, tickToken: true } });
+  await Promise.all(running.filter((c) => c.tickToken && !queuedCampaigns.has(`${c.id}:${c.tickToken}`)).map((c) =>
+    campaignQueue.add("tick", { campaignId: c.id, token: c.tickToken! }, { delay: 1000 }),
+  ));
+  // concorrência 1: os disparos de todas as campanhas saem em fila única, nunca em paralelo
+  workers.push(worker<{ campaignId: string; token: string }>(QUEUES.campaign, (j) => campaignTick(j.data.campaignId, j.data.token), 1));
   await queue("cron").upsertJobScheduler("no-reply", { every: 10 * 60_000 }, { name: "no-reply" });
   log(`Worker iniciado: ${workers.length} filas`);
 }

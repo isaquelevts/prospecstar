@@ -27,7 +27,7 @@ type Campaign = {
 type Target = { id: string; status: string; sentAt: string | null; repliedAt: string | null; error: string | null; message: string | null; lead: { id: string; name: string; phone: string | null; city: string | null } };
 
 const DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-const TARGET_STATUS: Record<string, string> = { PENDING: "Na fila", SENT: "Enviada", FAILED: "Falhou", SKIPPED: "Ignorada" };
+const TARGET_STATUS: Record<string, string> = { PENDING: "Na fila", SENDING: "Enviando", SENT: "Enviada", FAILED: "Falhou", SKIPPED: "Ignorada" };
 
 export default function CampaignPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -86,7 +86,7 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
         sub={
           <span className="inline-flex items-center gap-2">
             <Badge color={CAMPAIGN_STATUS[status]?.color}>{CAMPAIGN_STATUS[status]?.label}</Badge>
-            {stats.sent ?? 0} enviadas · {stats.pending ?? 0} na fila · {stats.replied ?? 0} respostas
+            {stats.sent ?? 0} enviadas · {(stats.pending ?? 0) + (stats.sending ?? 0)} vão receber · {stats.replied ?? 0} respostas
           </span>
         }
         actions={
