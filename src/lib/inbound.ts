@@ -27,7 +27,7 @@ const IGNORE = /@g\.us$|@broadcast$|@newsletter$|^status@/;
 /** Encontra o lead de um chat (por chatId, telefone ou resolvendo o LID) — cria se não existir. */
 async function findOrCreateLead(session: string, chatId: string, pushName?: string, create = true) {
   const byChat = await prisma.lead.findUnique({ where: { chatId } });
-  if (byChat) return byChat;
+  if (byChat) return { lead: byChat, created: false };
 
   let phone = chatIdToPhone(chatId);
   if (!phone && chatId.endsWith("@lid")) {
@@ -38,26 +38,24 @@ async function findOrCreateLead(session: string, chatId: string, pushName?: stri
     const byPhone = await findLeadByPhone(phone);
     if (byPhone) {
       if (!byPhone.chatId) await prisma.lead.update({ where: { id: byPhone.id }, data: { chatId, waExists: true } });
-      return byPhone;
+      return { lead: byPhone, created: false };
     }
   }
   if (!create) return null;
-  const s = await getSettings();
   const res = await createLeadIfNew(
     { name: pushName || (phone ? `+${phone}` : "Contato WhatsApp"), phone },
-    { source: "whatsapp" },
+    { source: "whatsapp", fireLeadCreated: false },
   );
   if (!res.lead) return null;
-  const agent = await resolveAgent(null);
-  return prisma.lead.update({
+  const lead = await prisma.lead.update({
     where: { id: res.lead.id },
     data: {
       chatId: chatId.endsWith("@lid") && phone ? phoneToChatId(phone) : chatId,
       waExists: true,
-      aiEnabled: s.AUTO_REPLY_NEW === "true" && !!agent,
-      agentId: agent?.id,
+      aiEnabled: false,
     },
   });
+  return { lead, created: res.created };
 }
 
 function messageText(m: WahaMessage) {
@@ -79,8 +77,9 @@ export async function handleWahaEvent(evt: WahaEvent) {
   if (m.fromMe) {
     if (m.source === "api") return; // enviada por este sistema; já registrada em sendToLead
     // enviada manualmente pelo celular / WhatsApp Web
-    const lead = await findOrCreateLead(evt.session, chatId, undefined, false);
-    if (!lead) return;
+    const found = await findOrCreateLead(evt.session, chatId, undefined, false);
+    if (!found) return;
+    const { lead } = found;
     await prisma.message.create({ data: { leadId: lead.id, direction: "OUT", body: text, wahaId: m.id, author: "human" } });
     const s = await getSettings();
     const pause = s.PAUSE_AI_ON_HUMAN === "true" && lead.aiEnabled;
@@ -94,8 +93,9 @@ export async function handleWahaEvent(evt: WahaEvent) {
 
   // ---- mensagem recebida do contato ----
   const pushName = m._data?.notifyName || m._data?.pushName || m._data?.Info?.PushName;
-  const lead = await findOrCreateLead(evt.session, chatId, typeof pushName === "string" ? pushName : undefined);
-  if (!lead) return;
+  const found = await findOrCreateLead(evt.session, chatId, typeof pushName === "string" ? pushName : undefined);
+  if (!found) return;
+  const { lead, created } = found;
 
   const now = new Date();
   await prisma.message.create({
@@ -122,10 +122,10 @@ export async function handleWahaEvent(evt: WahaEvent) {
     return;
   }
 
-  await fireTrigger("MESSAGE_RECEIVED", lead.id, { text });
+  if (!created) await fireTrigger("MESSAGE_RECEIVED", lead.id, { text });
 
   const fresh = await prisma.lead.findUnique({ where: { id: lead.id } });
-  if (fresh?.aiEnabled && !fresh.optOut) {
+  if (!created && fresh?.aiEnabled && !fresh.optOut) {
     const agent = await resolveAgent(fresh.agentId);
     if (agent) await debounceJob("ai", `ai-${lead.id}`, { leadId: lead.id }, agent.debounceSec * 1000);
   }

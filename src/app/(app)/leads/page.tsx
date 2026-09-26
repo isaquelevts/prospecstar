@@ -30,6 +30,8 @@ type Lead = {
   phone: string | null;
   city: string | null;
   category: string | null;
+  rating: number | null;
+  reviewsCount: number | null;
   website: string | null;
   websiteStatus: string | null;
   score: number;
@@ -213,7 +215,11 @@ function LeadsInner() {
                     <Link href={`/leads/${l.id}`} className="block truncate font-medium hover:text-cobalt">
                       {l.name}
                     </Link>
-                    <span className="block truncate text-xs text-mute">{[l.category, l.city].filter(Boolean).join(" · ")}</span>
+                    <span className="block truncate text-xs text-mute">
+                      {[l.category, l.city, l.reviewsCount != null ? `★ ${l.rating != null ? l.rating.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " · " : ""}${l.reviewsCount.toLocaleString("pt-BR")} avaliações` : null]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
                     {l.tags.length > 0 && (
                       <span className="mt-1 flex flex-wrap gap-1">
                         {l.tags.slice(0, 3).map((t) => (

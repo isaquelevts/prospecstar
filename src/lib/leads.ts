@@ -32,7 +32,10 @@ export async function findLeadByPhone(phone: string) {
 }
 
 /** Cria o lead se ainda não existir (deduplica por externalId e telefone). */
-export async function createLeadIfNew(input: LeadInput, opts: { source: string; scrapeJobId?: string; requirePhone?: boolean }) {
+export async function createLeadIfNew(
+  input: LeadInput,
+  opts: { source: string; scrapeJobId?: string; requirePhone?: boolean; fireLeadCreated?: boolean },
+) {
   if (input.permanentlyClosed) return { created: false as const, reason: "fechado" };
   const phone = normalizePhone(input.phone);
   if (opts.requirePhone && !phone) return { created: false as const, reason: "sem telefone" };
@@ -69,7 +72,7 @@ export async function createLeadIfNew(input: LeadInput, opts: { source: string; 
     },
   });
   await queue("enrich").add("enrich", { leadId: lead.id });
-  await fireTrigger("LEAD_CREATED", lead.id);
+  if (opts.fireLeadCreated !== false) await fireTrigger("LEAD_CREATED", lead.id);
   return { created: true as const, lead };
 }
 
@@ -158,4 +161,3 @@ export function parseLeadFilter(sp: URLSearchParams): LeadFilter {
     scrapeJobId: sp.get("scrapeJobId") || undefined,
   };
 }
-

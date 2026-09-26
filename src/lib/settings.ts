@@ -8,7 +8,6 @@ export const SETTING_KEYS = {
   WAHA_API_KEY: "API key do WAHA",
   WAHA_SESSION: "Sessão padrão do WAHA (no WAHA Core gratuito só existe 'default')",
   PUBLIC_URL: "URL que o WAHA usa para chamar este sistema (dentro do Docker: http://app:3000)",
-  AUTO_REPLY_NEW: "Responder com IA contatos novos que chegarem sozinhos (true/false)",
   PAUSE_AI_ON_HUMAN: "Pausar a IA do lead quando você responder pelo celular (true/false)",
   OPT_OUT_KEYWORDS: "Palavras de descadastro (separadas por vírgula)",
 } as const;
@@ -20,7 +19,6 @@ const DEFAULTS: Partial<Record<SettingKey, string>> = {
   WAHA_URL: "http://waha:3000",
   WAHA_SESSION: "default",
   PUBLIC_URL: "http://app:3000",
-  AUTO_REPLY_NEW: "true",
   PAUSE_AI_ON_HUMAN: "true",
   OPT_OUT_KEYWORDS: "sair,parar,pare,descadastrar,remover meu número,não me mande",
 };

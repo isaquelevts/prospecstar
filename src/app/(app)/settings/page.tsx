@@ -17,9 +17,9 @@ const WA_STATUS: Record<string, string> = {
   UNREACHABLE: "WAHA fora do ar ou URL/API key incorreta",
 };
 
-const BOOL_KEYS = ["AUTO_REPLY_NEW", "PAUSE_AI_ON_HUMAN"];
+const BOOL_KEYS = ["PAUSE_AI_ON_HUMAN"];
 const GROUPS = [
-  { title: "Inteligência artificial", keys: ["OPENAI_API_KEY", "AUTO_REPLY_NEW", "PAUSE_AI_ON_HUMAN", "OPT_OUT_KEYWORDS"] },
+  { title: "Inteligência artificial", keys: ["OPENAI_API_KEY", "PAUSE_AI_ON_HUMAN", "OPT_OUT_KEYWORDS"] },
   { title: "Captação", keys: ["APIFY_TOKEN", "GOOGLE_PLACES_KEY"] },
   { title: "WAHA (WhatsApp)", keys: ["WAHA_URL", "WAHA_API_KEY", "WAHA_SESSION", "PUBLIC_URL"] },
 ];
