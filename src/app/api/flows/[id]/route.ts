@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import { body, route } from "@/lib/api";
 import { FlowInput } from "@/lib/schemas";
+import { validateGraph } from "@/lib/flow-graph";
+import type { FlowStep, TriggerConfig } from "@/lib/flow-types";
 
 export const GET = route<{ id: string }>(async (_req, { id }) => {
   const flow = await prisma.flow.findUniqueOrThrow({ where: { id } });
@@ -15,6 +17,16 @@ export const GET = route<{ id: string }>(async (_req, { id }) => {
 
 export const PATCH = route<{ id: string }>(async (req, { id }) => {
   const data = FlowInput.partial().parse(await body(req));
+  const current = await prisma.flow.findUniqueOrThrow({ where: { id } });
+  const steps = (data.steps ?? current.steps) as FlowStep[];
+  const config = (data.triggerConfig ?? current.triggerConfig) as TriggerConfig;
+  validateGraph(steps, config);
+  if (data.steps || data.triggerConfig) {
+    const running = await prisma.flowRun.count({ where: { flowId: id, status: { in: ["RUNNING", "WAITING"] } } });
+    if (running && (JSON.stringify(data.steps ?? current.steps) !== JSON.stringify(current.steps) || JSON.stringify(data.triggerConfig ?? current.triggerConfig) !== JSON.stringify(current.triggerConfig))) {
+      return Response.json({ error: "Há execuções em andamento. Pare todas antes de alterar os passos ou o gatilho." }, { status: 409 });
+    }
+  }
   return prisma.flow.update({
     where: { id },
     data: {

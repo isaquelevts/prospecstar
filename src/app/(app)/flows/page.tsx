@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, Empty, PageHeader, Toggle, api, useAction, useApi } from "@/components/ui";
-import { STEP_LABELS, TRIGGERS, type FlowStep, type TriggerType } from "@/lib/flow-types";
+import { TRIGGERS, type FlowStep, type TriggerType } from "@/lib/flow-types";
 
 type Flow = { id: string; name: string; active: boolean; trigger: TriggerType; steps: FlowStep[]; stats: Record<string, number> };
 
@@ -18,6 +18,29 @@ export default function FlowsPage() {
         title="Automações"
         sub="Sequências que rodam sozinhas a partir de um gatilho: follow-ups, mudança de etapa, ligar a IA, avisar você."
         actions={
+          <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={async () => {
+              const f = await run(() => api<{ id: string }>("/api/flows", {
+                body: {
+                  name: "Follow-up de WhatsApp",
+                  trigger: "NO_REPLY",
+                  triggerConfig: { hours: 24 },
+                  stopOnReply: true,
+                  steps: [
+                    { type: "send_message", texts: ["{{saudacao}}, passando para saber se você conseguiu ver minha mensagem anterior." ] },
+                    { type: "wait", amount: 2, unit: "days" },
+                    { type: "send_message", texts: ["{{saudacao}}, posso ajudar com alguma dúvida? Se não for o momento, sem problemas."] },
+                  ],
+                },
+              }));
+              if (f) router.push(`/flows/${f.id}`);
+            }}
+          >
+            Criar follow-up
+          </Button>
           <Button
             disabled={busy}
             onClick={async () => {
@@ -31,6 +54,7 @@ export default function FlowsPage() {
           >
             Nova automação
           </Button>
+          </div>
         }
       />
       {data?.length === 0 ? (
@@ -49,7 +73,7 @@ export default function FlowsPage() {
               <Link href={`/flows/${f.id}`} className="min-w-0 flex-1">
                 <p className="font-display font-bold hover:text-cobalt">{f.name}</p>
                 <p className="truncate text-xs text-mute">
-                  Quando: {TRIGGERS[f.trigger]} → {f.steps.map((s) => STEP_LABELS[s.type]).join(" → ") || "sem passos"}
+                  Quando: {TRIGGERS[f.trigger]} · {f.steps.length} {f.steps.length === 1 ? "bloco" : "blocos"}
                 </p>
               </Link>
               <div className="flex gap-1.5 text-xs">

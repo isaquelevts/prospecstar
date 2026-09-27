@@ -6,6 +6,7 @@ import { use, useEffect, useState } from "react";
 import { Badge, Button, Card, Field, Input, PageHeader, Select, Textarea, Toggle, api, timeAgo, useAction, useApi } from "@/components/ui";
 import { STEP_LABELS, TRIGGERS, defaultStep, type FlowStep, type TriggerConfig, type TriggerType } from "@/lib/flow-types";
 import { WEBSITE_STATUS_LABEL } from "@/lib/website";
+import { FlowCanvas, ensureGraph } from "@/components/flow-canvas";
 
 type Flow = { id: string; name: string; active: boolean; trigger: TriggerType; triggerConfig: TriggerConfig; steps: FlowStep[]; stopOnReply: boolean };
 type Run = { id: string; status: string; stepIndex: number; updatedAt: string; nextRunAt: string | null; log: { at: string; msg: string }[]; lead: { id: string; name: string } };
@@ -89,10 +90,7 @@ function StepEditor({ step, onChange, stages, agents }: { step: FlowStep; onChan
           ) : (
             <Input value={step.value} onChange={(e) => onChange({ ...step, value: e.target.value })} />
           )}
-          <Select value={step.onFail} onChange={(e) => onChange({ ...step, onFail: e.target.value as "stop" })}>
-            <option value="stop">se falso: parar</option>
-            <option value="skip_next">se falso: pular próximo</option>
-          </Select>
+          <p className="self-center text-xs text-mute">Ligue as saídas Sim e Não no mapa. Sem ligação, a sequência termina.</p>
         </div>
       );
     case "move_stage":
@@ -140,19 +138,32 @@ export default function FlowPage({ params }: { params: Promise<{ id: string }> }
   const { data: agents } = useApi<Opt[]>("/api/agents");
   const [f, setF] = useState<Flow | null>(null);
   const [adding, setAdding] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);
   const { run, busy } = useAction();
 
   useEffect(() => {
-    if (data && !f) setF(data.flow);
+    if (data && !f) setF({ ...data.flow, ...ensureGraph(data.flow) });
   }, [data, f]);
   if (!f || !data) return <p className="text-sm text-mute">Carregando…</p>;
   const set = (p: Partial<Flow>) => setF({ ...f, ...p });
   const setStep = (i: number, s: FlowStep) => set({ steps: f.steps.map((x, j) => (j === i ? s : x)) });
-  const move = (i: number, d: number) => {
-    const s = [...f.steps];
-    const [x] = s.splice(i, 1);
-    s.splice(i + d, 0, x);
-    set({ steps: s });
+  const selectedIndex = f.steps.findIndex((step) => step.id === selected);
+  const addStep = (type: FlowStep["type"]) => {
+    const next = { ...defaultStep(type), id: crypto.randomUUID(), nextStepId: null, falseStepId: null, position: { x: 120, y: 160 + f.steps.length * 160 } } as FlowStep;
+    const tail = [...f.steps].reverse().find((step) => !step.nextStepId);
+    set({
+      steps: [...f.steps.map((step) => step.id === tail?.id ? { ...step, nextStepId: next.id } : step), next],
+      triggerConfig: tail ? f.triggerConfig : { ...f.triggerConfig, startStepId: next.id },
+    });
+    setSelected(next.id!);
+    setAdding("");
+  };
+  const removeStep = (step: FlowStep) => {
+    set({
+      steps: f.steps.filter((s) => s.id !== step.id).map((s) => ({ ...s, nextStepId: s.nextStepId === step.id ? step.nextStepId ?? null : s.nextStepId, falseStepId: s.falseStepId === step.id ? step.nextStepId ?? null : s.falseStepId })),
+      triggerConfig: f.triggerConfig.startStepId === step.id ? { ...f.triggerConfig, startStepId: step.nextStepId ?? null } : f.triggerConfig,
+    });
+    setSelected(null);
   };
   const save = () =>
     run(async () => {
@@ -186,7 +197,7 @@ export default function FlowPage({ params }: { params: Promise<{ id: string }> }
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Quando começar">
-                <Select value={f.trigger} onChange={(e) => set({ trigger: e.target.value as TriggerType, triggerConfig: {} })}>
+                <Select value={f.trigger} onChange={(e) => set({ trigger: e.target.value as TriggerType, triggerConfig: { graphVersion: 1, startStepId: f.triggerConfig.startStepId } })}>
                   {Object.entries(TRIGGERS).map(([k, v]) => (
                     <option key={k} value={k}>
                       {v}
@@ -196,12 +207,12 @@ export default function FlowPage({ params }: { params: Promise<{ id: string }> }
               </Field>
               {f.trigger === "MESSAGE_RECEIVED" && (
                 <Field label="Palavras-chave (opcional)" hint="Separadas por vírgula. Vazio = qualquer mensagem.">
-                  <Input value={f.triggerConfig.keyword ?? ""} onChange={(e) => set({ triggerConfig: { keyword: e.target.value } })} placeholder="preço, orçamento, valor" />
+                  <Input value={f.triggerConfig.keyword ?? ""} onChange={(e) => set({ triggerConfig: { ...f.triggerConfig, keyword: e.target.value } })} placeholder="preço, orçamento, valor" />
                 </Field>
               )}
               {f.trigger === "STAGE_CHANGED" && (
                 <Field label="Etapa">
-                  <Select value={f.triggerConfig.stageId ?? ""} onChange={(e) => set({ triggerConfig: { stageId: e.target.value } })}>
+                  <Select value={f.triggerConfig.stageId ?? ""} onChange={(e) => set({ triggerConfig: { ...f.triggerConfig, stageId: e.target.value } })}>
                     <option value="">Qualquer etapa</option>
                     {stages?.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -213,43 +224,26 @@ export default function FlowPage({ params }: { params: Promise<{ id: string }> }
               )}
               {f.trigger === "TAG_ADDED" && (
                 <Field label="Tag">
-                  <Input value={f.triggerConfig.tag ?? ""} onChange={(e) => set({ triggerConfig: { tag: e.target.value } })} />
+                  <Input value={f.triggerConfig.tag ?? ""} onChange={(e) => set({ triggerConfig: { ...f.triggerConfig, tag: e.target.value } })} />
                 </Field>
               )}
               {f.trigger === "NO_REPLY" && (
                 <Field label="Horas sem resposta" hint="Conta a partir da última mensagem enviada ao lead.">
-                  <Input type="number" min={1} value={f.triggerConfig.hours ?? 24} onChange={(e) => set({ triggerConfig: { hours: Number(e.target.value) } })} />
+                  <Input type="number" min={1} value={f.triggerConfig.hours ?? 24} onChange={(e) => set({ triggerConfig: { ...f.triggerConfig, hours: Number(e.target.value) } })} />
                 </Field>
               )}
             </div>
             <Toggle checked={f.stopOnReply} onChange={(v) => set({ stopOnReply: v })} label="Não enviar mais mensagens deste fluxo se o lead responder" />
           </Card>
 
-          <ol className="space-y-3">
-            {f.steps.map((s, i) => (
-              <li key={i}>
-                <Card className="p-4">
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="grid h-6 w-6 place-items-center rounded-full bg-ink font-mono text-[11px] text-white">{i + 1}</span>
-                    <span className="text-sm font-medium">{STEP_LABELS[s.type]}</span>
-                    <div className="ml-auto flex gap-1 text-xs">
-                      <button disabled={i === 0} onClick={() => move(i, -1)} className="rounded px-1.5 py-0.5 text-mute hover:bg-ink/5 disabled:opacity-30" aria-label="Subir">
-                        ↑
-                      </button>
-                      <button disabled={i === f.steps.length - 1} onClick={() => move(i, 1)} className="rounded px-1.5 py-0.5 text-mute hover:bg-ink/5 disabled:opacity-30" aria-label="Descer">
-                        ↓
-                      </button>
-                      <button onClick={() => set({ steps: f.steps.filter((_, j) => j !== i) })} className="rounded px-1.5 py-0.5 text-mute hover:bg-bad-soft hover:text-bad">
-                        remover
-                      </button>
-                    </div>
-                  </div>
-                  <StepEditor step={s} onChange={(n) => setStep(i, n)} stages={stages} agents={agents} />
-                </Card>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-3 flex gap-2">
+          <Card className="mb-4 p-4">
+            <h2 className="font-display font-bold">Mapa da automação</h2>
+            <p className="mb-3 text-xs text-mute">Arraste os blocos para organizar. Ligue os pontos para definir a sequência; em condições, a saída laranja é o caminho “Não”. Clique num bloco para editar.</p>
+            <FlowCanvas graph={f} onChange={(graph) => set({ steps: graph.steps, triggerConfig: graph.triggerConfig })} selected={selected} onSelect={setSelected} />
+          </Card>
+          <Card className="p-4">
+            <h2 className="mb-3 font-display font-bold">Adicionar bloco</h2>
+            <div className="flex flex-wrap gap-2">
             <Select value={adding} onChange={(e) => setAdding(e.target.value)} className="w-72">
               <option value="">Escolha um passo…</option>
               {Object.entries(STEP_LABELS).map(([k, v]) => (
@@ -258,17 +252,21 @@ export default function FlowPage({ params }: { params: Promise<{ id: string }> }
                 </option>
               ))}
             </Select>
-            <Button
-              variant="outline"
-              disabled={!adding}
-              onClick={() => {
-                set({ steps: [...f.steps, defaultStep(adding as FlowStep["type"])] });
-                setAdding("");
-              }}
-            >
-              Adicionar passo
-            </Button>
-          </div>
+            <Button variant="outline" disabled={!adding} onClick={() => addStep(adding as FlowStep["type"])}>Adicionar bloco</Button>
+            </div>
+          </Card>
+          <Card className="mt-4 p-4">
+            <h2 className="mb-3 font-display font-bold">Configuração do bloco</h2>
+            {selectedIndex < 0 ? <p className="text-sm text-mute">Selecione um bloco no mapa para ajustar mensagem, prazo ou condição.</p> : (
+              <div>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">{STEP_LABELS[f.steps[selectedIndex].type]}</p>
+                  <button onClick={() => removeStep(f.steps[selectedIndex])} className="text-xs text-bad hover:underline">Remover bloco</button>
+                </div>
+                <StepEditor step={f.steps[selectedIndex]} onChange={(step) => setStep(selectedIndex, step)} stages={stages} agents={agents} />
+              </div>
+            )}
+          </Card>
           <p className="mt-3 text-xs text-mute">
             Nas mensagens valem as variáveis <code className="font-mono">{"{{nome}}"}</code>, <code className="font-mono">{"{{saudacao}}"}</code>, <code className="font-mono">{"{{cidade}}"}</code> e o sorteio{" "}
             <code className="font-mono">{"{a|b}"}</code>.

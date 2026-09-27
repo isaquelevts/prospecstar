@@ -2,6 +2,7 @@ import type { Flow, FlowRun, Lead, Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { queue } from "./queue";
 import type { FlowStep, TriggerConfig, TriggerType } from "./flow-types";
+import { firstStepIndex, nextStepIndex } from "./flow-graph";
 import { leadVariables, pick, renderTemplate } from "./template";
 
 const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -37,7 +38,8 @@ export async function startFlow(flowId: string, leadId: string) {
     where: { flowId, leadId, status: { in: ["RUNNING", "WAITING"] } },
   });
   if (running) return null;
-  const run = await prisma.flowRun.create({ data: { flowId, leadId } });
+  const flow = await prisma.flow.findUniqueOrThrow({ where: { id: flowId } });
+  const run = await prisma.flowRun.create({ data: { flowId, leadId, stepIndex: firstStepIndex(flow.steps as FlowStep[], flow.triggerConfig as TriggerConfig) } });
   await queue("flow").add("run", { runId: run.id });
   return run;
 }
@@ -78,6 +80,7 @@ export async function executeRun(runId: string) {
   const run = await prisma.flowRun.findUnique({ where: { id: runId }, include: { flow: true } });
   if (!run || !["RUNNING", "WAITING"].includes(run.status)) return;
   const steps = (run.flow.steps ?? []) as FlowStep[];
+  const config = run.flow.triggerConfig as TriggerConfig;
   const log = (run.log ?? []) as Array<{ at: string; msg: string }>;
   const note = (msg: string) => log.push({ at: new Date().toISOString(), msg });
   const save = (data: Partial<FlowRun>) =>
@@ -119,7 +122,7 @@ export async function executeRun(runId: string) {
           const ms = Math.max(1, step.amount) * UNIT_MS[step.unit];
           note(`Aguardando ${step.amount} ${step.unit}`);
           await queue("flow").add("run", { runId: run.id }, { delay: ms });
-          return save({ status: "WAITING", stepIndex: i + 1, nextRunAt: new Date(Date.now() + ms) });
+          return save({ status: "WAITING", stepIndex: nextStepIndex(steps, config, i), nextRunAt: new Date(Date.now() + ms) });
         }
         case "stop_if_replied":
           if (replied) {
@@ -130,6 +133,12 @@ export async function executeRun(runId: string) {
         case "condition":
           if (!evalCondition(step, lead)) {
             note(`Condição falsa (${step.field} ${step.op} ${step.value})`);
+            if (config.graphVersion === 1) {
+              if (!step.falseStepId) return save({ status: "STOPPED", stepIndex: i });
+              i = nextStepIndex(steps, config, i, "false");
+              await save({ status: "RUNNING", stepIndex: i });
+              continue;
+            }
             if (step.onFail === "stop") return save({ status: "STOPPED", stepIndex: i });
             i++; // pula o próximo passo
           }
@@ -163,7 +172,7 @@ export async function executeRun(runId: string) {
       note(`Erro no passo ${i + 1}: ${String(e).slice(0, 300)}`);
       return save({ status: "FAILED", stepIndex: i });
     }
-    i++;
+    i = nextStepIndex(steps, config, i);
     await save({ status: "RUNNING", stepIndex: i });
   }
   note("Fluxo concluído");

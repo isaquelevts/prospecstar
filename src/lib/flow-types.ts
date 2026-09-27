@@ -16,9 +16,11 @@ export type TriggerConfig = {
   stageId?: string; // STAGE_CHANGED
   tag?: string; // TAG_ADDED
   hours?: number; // NO_REPLY
+  graphVersion?: number;
+  startStepId?: string | null;
 };
 
-export type FlowStep =
+export type FlowStep = (
   | { type: "send_message"; texts: string[] }
   | { type: "ai_message"; instruction: string; agentId?: string }
   | { type: "wait"; amount: number; unit: "minutes" | "hours" | "days" }
@@ -28,7 +30,8 @@ export type FlowStep =
   | { type: "add_tag"; tag: string }
   | { type: "remove_tag"; tag: string }
   | { type: "set_ai"; enabled: boolean; agentId?: string }
-  | { type: "webhook"; url: string };
+  | { type: "webhook"; url: string }
+) & { id?: string; nextStepId?: string | null; falseStepId?: string | null; position?: { x: number; y: number } };
 
 export const STEP_LABELS: Record<FlowStep["type"], string> = {
   send_message: "Enviar mensagem",
