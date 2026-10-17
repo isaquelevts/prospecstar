@@ -93,7 +93,7 @@ function Playground({ agentId, beforeRun }: { agentId: string; beforeRun: () => 
     <Card className="flex h-[calc(100vh-10rem)] flex-col overflow-hidden xl:sticky xl:top-6">
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <div>
-          <h2 className="font-display font-bold">Testar agente</h2>
+          <h2 className="font-semibold">Testar agente</h2>
           <p className="text-xs text-mute">Você é o cliente. Nada é enviado nem salvo.</p>
         </div>
         <Button size="sm" variant="ghost" onClick={() => setTurns([])}>
@@ -225,7 +225,7 @@ export default function AgentPage({ params }: { params: Promise<{ id: string }> 
           </Card>
 
           <Card className="space-y-4 p-5">
-            <h2 className="font-display font-bold">O que o agente pode fazer</h2>
+            <h2 className="font-semibold">O que o agente pode fazer</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               <Toggle checked={a.canMoveStage} onChange={(v) => set({ canMoveStage: v })} label="Mover o lead no funil" />
               <Toggle checked={a.canTag} onChange={(v) => set({ canTag: v })} label="Adicionar tags" />
@@ -238,7 +238,7 @@ export default function AgentPage({ params }: { params: Promise<{ id: string }> 
           </Card>
 
           <Card className="space-y-4 p-5">
-            <h2 className="font-display font-bold">Comportamento</h2>
+            <h2 className="font-semibold">Comportamento</h2>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Esperar antes de responder (s)" hint="Junta mensagens picadas do cliente numa resposta só.">
                 <Input type="number" min={0} value={a.debounceSec} onChange={(e) => set({ debounceSec: Number(e.target.value) })} />

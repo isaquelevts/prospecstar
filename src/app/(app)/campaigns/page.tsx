@@ -59,7 +59,7 @@ export default function CampaignsPage() {
             return (
               <Card key={c.id} className="p-5 transition-colors hover:border-ink/25">
                   <div className="mb-3 flex items-start justify-between gap-2">
-                    <Link href={`/campaigns/${c.id}`} className="font-display text-lg leading-tight font-bold hover:text-cobalt">{c.name}</Link>
+                    <Link href={`/campaigns/${c.id}`} className="text-lg leading-tight font-semibold hover:text-cobalt">{c.name}</Link>
                     <Badge color={CAMPAIGN_STATUS[c.status]?.color}>{CAMPAIGN_STATUS[c.status]?.label}</Badge>
                   </div>
                   <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-line">
@@ -73,7 +73,7 @@ export default function CampaignsPage() {
                       ["Falhas e ignorados", c.stats.failed + c.stats.skipped],
                     ].map(([k, v]) => (
                       <div key={k as string}>
-                        <p className="font-display text-xl font-bold tabular-nums">{v}</p>
+                        <p className="text-xl font-semibold tabular-nums">{v}</p>
                         <p className="text-[11px] text-mute">{k}</p>
                       </div>
                     ))}

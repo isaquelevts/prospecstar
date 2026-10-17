@@ -44,6 +44,7 @@ export default function LeadPage({ params }: { params: Promise<{ id: string }> }
   const { data: stages } = useApi<Array<{ id: string; name: string }>>("/api/stages");
   const { data: agents } = useApi<Array<{ id: string; name: string }>>("/api/agents");
   const { data: flows } = useApi<Array<{ id: string; name: string }>>("/api/flows");
+  const { data: wa } = useApi<{ status: string }>("/api/whatsapp", { refreshInterval: 30_000 });
   const { run, busy } = useAction();
   const [edit, setEdit] = useState<Partial<LeadDetail>>({});
   const [note, setNote] = useState("");
@@ -65,7 +66,7 @@ export default function LeadPage({ params }: { params: Promise<{ id: string }> }
           <Link href="/leads" className="text-xs text-mute hover:text-ink">
             ← Leads
           </Link>
-          <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">{lead.name}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{lead.name}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
             <Heat score={lead.score} />
             <SiteBadge status={lead.websiteStatus} />
@@ -185,7 +186,7 @@ export default function LeadPage({ params }: { params: Promise<{ id: string }> }
 
           <div className="grid gap-6 md:grid-cols-2">
             <Card className="p-5">
-              <h2 className="mb-3 font-display font-bold">Dados coletados</h2>
+              <h2 className="mb-3 font-semibold">Dados coletados</h2>
               <dl className="space-y-1.5 text-sm">
                 {lead.address && <Row k="Endereço" v={lead.address} />}
                 {lead.mapsUrl && <Row k="Google Maps" v={<a className="text-cobalt underline" href={lead.mapsUrl} target="_blank" rel="noreferrer">abrir</a>} />}
@@ -201,7 +202,7 @@ export default function LeadPage({ params }: { params: Promise<{ id: string }> }
               </dl>
             </Card>
             <Card className="p-5">
-              <h2 className="mb-3 font-display font-bold">Campanhas e automações</h2>
+              <h2 className="mb-3 font-semibold">Campanhas e automações</h2>
               <ul className="space-y-1.5 text-sm">
                 {lead.campaignTargets.map((c) => (
                   <li key={c.id} className="flex justify-between gap-2">
@@ -221,7 +222,7 @@ export default function LeadPage({ params }: { params: Promise<{ id: string }> }
           </div>
 
           <Card className="p-5">
-            <h2 className="mb-3 font-display font-bold">Histórico</h2>
+            <h2 className="mb-3 font-semibold">Histórico</h2>
             <form
               className="mb-4 flex gap-2"
               onSubmit={async (e) => {
@@ -248,7 +249,7 @@ export default function LeadPage({ params }: { params: Promise<{ id: string }> }
         </div>
 
         <Card className="h-[calc(100vh-10rem)] overflow-hidden xl:sticky xl:top-6">
-          <ChatPanel leadId={id} aiEnabled={lead.aiEnabled} onChange={() => mutate()} />
+          <ChatPanel leadId={id} leadName={lead.name} aiEnabled={lead.aiEnabled} onChange={() => mutate()} connected={wa ? wa.status === "WORKING" : true} />
         </Card>
       </div>
     </>

@@ -15,6 +15,8 @@ const Bulk = z.object({
 
 export const POST = route(async (req) => {
   const { ids, filter, action, value } = Bulk.parse(await body(req));
+  if (["tag", "untag", "stage", "flow", "campaign"].includes(action) && !value?.trim()) throw new Error("Escolha um valor para esta ação.");
+  if (!ids?.length && !filter) throw new Error("Nenhum lead selecionado.");
   const where = ids?.length ? { id: { in: ids } } : buildLeadWhere(filter ?? {});
   const leads = await prisma.lead.findMany({ where, select: { id: true }, take: 20_000 });
   const leadIds = leads.map((l) => l.id);

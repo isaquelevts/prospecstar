@@ -161,7 +161,7 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
           </Card>
 
           <Card className="p-5">
-            <h2 className="mb-4 font-display font-bold">Quem vai receber</h2>
+            <h2 className="mb-4 font-semibold">Quem vai receber</h2>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Etapa">
                 <Select value={c.filter.stageId ?? ""} onChange={(e) => setFilter({ stageId: e.target.value || undefined })}>
@@ -266,7 +266,7 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
 
         <div className="space-y-6">
           <Card className="space-y-4 p-5">
-            <h2 className="font-display font-bold">Ritmo de envio</h2>
+            <h2 className="font-semibold">Ritmo de envio</h2>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Intervalo mínimo (s)">
                 <Input type="number" min={10} value={c.minDelaySec} onChange={(e) => set({ minDelaySec: Number(e.target.value) })} />
@@ -301,7 +301,7 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
           </Card>
 
           <Card className="space-y-4 p-5">
-            <h2 className="font-display font-bold">Quando responderem</h2>
+            <h2 className="font-semibold">Quando responderem</h2>
             <Field label="Agente de IA que assume a conversa" hint="Sem agente, as respostas ficam para você na tela de Conversas.">
               <Select value={c.agentId ?? ""} onChange={(e) => set({ agentId: e.target.value || null })}>
                 <option value="">Nenhum (atendimento manual)</option>
@@ -325,7 +325,7 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
           </Card>
 
           <Card className="p-5">
-            <h2 className="mb-3 font-display font-bold">Prévia</h2>
+            <h2 className="mb-3 font-semibold">Prévia</h2>
             {preview?.examples.length ? (
               <div className="space-y-3">
                 {preview.examples.map((e, i) => (

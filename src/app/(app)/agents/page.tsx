@@ -40,7 +40,7 @@ export default function AgentsPage() {
             <Link key={a.id} href={`/agents/${a.id}`}>
               <Card className="h-full p-5 transition-colors hover:border-ink/25">
                 <div className="mb-2 flex items-center gap-2">
-                  <h3 className="font-display text-lg font-bold">{a.name}</h3>
+                  <h3 className="text-base font-semibold">{a.name}</h3>
                   {a.isDefault && <Badge className="bg-cobalt-soft text-cobalt">padrão</Badge>}
                   {!a.enabled && <Badge>desligado</Badge>}
                 </div>

@@ -71,7 +71,7 @@ export default function FlowsPage() {
                 }}
               />
               <Link href={`/flows/${f.id}`} className="min-w-0 flex-1">
-                <p className="font-display font-bold hover:text-cobalt">{f.name}</p>
+                <p className="font-semibold hover:text-cobalt">{f.name}</p>
                 <p className="truncate text-xs text-mute">
                   Quando: {TRIGGERS[f.trigger]} · {f.steps.length} {f.steps.length === 1 ? "bloco" : "blocos"}
                 </p>

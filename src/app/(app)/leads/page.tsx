@@ -105,7 +105,7 @@ function LeadsInner() {
       />
 
       <Card className="mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-6">
-        <Input placeholder="Buscar nome, telefone, cidade…" defaultValue={filter.q} onKeyDown={(e) => e.key === "Enter" && setF("q", e.currentTarget.value)} onBlur={(e) => e.target.value !== (filter.q ?? "") && setF("q", e.target.value)} className="lg:col-span-2" />
+        <Input key={`q-${filter.q ?? ""}`} placeholder="Buscar nome, telefone, cidade…" defaultValue={filter.q} onKeyDown={(e) => e.key === "Enter" && setF("q", e.currentTarget.value)} onBlur={(e) => e.target.value !== (filter.q ?? "") && setF("q", e.target.value)} className="lg:col-span-2" />
         <Select value={filter.stageId ?? ""} onChange={(e) => setF("stageId", e.target.value)} aria-label="Etapa">
           <option value="">Todas as etapas</option>
           {stages?.map((s) => (
@@ -123,7 +123,7 @@ function LeadsInner() {
             </option>
           ))}
         </Select>
-        <Input placeholder="Tag" defaultValue={filter.tag} onKeyDown={(e) => e.key === "Enter" && setF("tag", e.currentTarget.value)} onBlur={(e) => e.target.value !== (filter.tag ?? "") && setF("tag", e.target.value)} />
+        <Input key={`tag-${filter.tag ?? ""}`} placeholder="Tag" defaultValue={filter.tag} onKeyDown={(e) => e.key === "Enter" && setF("tag", e.currentTarget.value)} onBlur={(e) => e.target.value !== (filter.tag ?? "") && setF("tag", e.target.value)} />
         <Select value={filter.neverContacted ? "never" : filter.hasPhone ? "phone" : ""} onChange={(e) => {
           const n = new URLSearchParams(sp.toString());
           n.delete("neverContacted");

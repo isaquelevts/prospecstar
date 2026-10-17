@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import type { Campaign } from "@prisma/client";
 import { prisma } from "./db";
 import { queue } from "./queue";
 import { buildLeadWhere, addActivity, changeStage, type LeadFilter } from "./leads";
@@ -65,12 +66,30 @@ export async function campaignTick(campaignId: string, token: string) {
   const c = await prisma.campaign.findUnique({ where: { id: campaignId } });
   if (!c || c.status !== "RUNNING" || c.tickToken !== token) return;
   const next = (ms: number) => queue("campaign").add("tick", { campaignId, token }, { delay: ms });
+  try {
+    return await tick(c, next);
+  } catch (e) {
+    // Qualquer erro inesperado não pode matar a corrente de ticks: tenta de novo em 1 minuto.
+    console.error(`campanha ${campaignId}: erro no tick`, e);
+    await prisma.campaignTarget.updateMany({ where: { campaignId, status: "SENDING" }, data: { status: "PENDING" } }).catch(() => null);
+    return next(60_000);
+  }
+}
 
+async function tick(c: Campaign, next: (ms: number) => Promise<unknown>) {
+  const campaignId = c.id;
   if (!insideWindow(c)) return next(10 * 60_000);
   if ((await sentToday(c.id)) >= c.dailyLimit) return next(30 * 60_000);
 
+  const templates = c.templates.filter((t) => t.trim());
+  if (!templates.length) {
+    await prisma.campaign.update({ where: { id: c.id }, data: { status: "PAUSED", tickToken: null } });
+    return;
+  }
+
   const target = await prisma.campaignTarget.findFirst({
     where: { campaignId, status: "PENDING" },
+    orderBy: [{ lead: { score: "desc" } }, { id: "asc" }],
     include: { lead: true },
   });
   if (!target) {
@@ -78,7 +97,7 @@ export async function campaignTick(campaignId: string, token: string) {
     return;
   }
 
-  // Atomically claim the target so the UI cannot remove it after sending starts.
+  // Reserva o destinatário de forma atômica para a tela não removê-lo depois que o envio começou.
   const claimed = await prisma.campaignTarget.updateMany({
     where: { id: target.id, status: "PENDING" },
     data: { status: "SENDING" },
@@ -91,27 +110,32 @@ export async function campaignTick(campaignId: string, token: string) {
     return next(1000);
   }
 
-  const text = renderTemplate(pick(c.templates.filter((t) => t.trim())), leadVariables(lead));
+  const text = renderTemplate(pick(templates), leadVariables(lead));
   try {
     await sendToLead(lead.id, text, "campaign", { session: c.session });
-    await prisma.campaignTarget.update({
-      where: { id: target.id },
-      data: { status: "SENT", sentAt: new Date(), message: text },
-    });
-    await prisma.lead.update({
-      where: { id: lead.id },
-      data: c.agentId ? { agentId: c.agentId, aiEnabled: true } : {},
-    });
-    await addActivity(lead.id, "campaign", `Mensagem da campanha "${c.name}" enviada`);
-    if (c.moveToStageId) await changeStage(lead.id, c.moveToStageId, `campanha "${c.name}"`);
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e);
+    const noWhatsApp = msg.includes("não tem WhatsApp");
     await prisma.campaignTarget.update({
       where: { id: target.id },
-      data: { status: msg.includes("não tem WhatsApp") ? "SKIPPED" : "FAILED", error: msg.slice(0, 500) },
+      data: { status: noWhatsApp ? "SKIPPED" : "FAILED", error: msg.slice(0, 500) },
     });
     // número sem WhatsApp não conta como envio: segue rápido para o próximo
-    if (msg.includes("não tem WhatsApp")) return next(randomBetween(3000, 8000));
+    if (noWhatsApp) return next(randomBetween(3000, 8000));
+    // WhatsApp desconectado: não queima a lista inteira, espera reconectar
+    if (msg.includes("não está conectado")) {
+      await prisma.campaignTarget.update({ where: { id: target.id }, data: { status: "PENDING", error: null } });
+      return next(5 * 60_000);
+    }
+    return next(randomBetween(c.minDelaySec, c.maxDelaySec) * 1000);
   }
+
+  await prisma.campaignTarget.update({
+    where: { id: target.id },
+    data: { status: "SENT", sentAt: new Date(), message: text },
+  });
+  if (c.agentId) await prisma.lead.update({ where: { id: lead.id }, data: { agentId: c.agentId, aiEnabled: true } });
+  await addActivity(lead.id, "campaign", `Mensagem da campanha "${c.name}" enviada`);
+  if (c.moveToStageId) await changeStage(lead.id, c.moveToStageId, `campanha "${c.name}"`);
   return next(randomBetween(c.minDelaySec, c.maxDelaySec) * 1000);
 }

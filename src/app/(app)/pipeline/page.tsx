@@ -28,7 +28,7 @@ function Column({ stage, q, onDrop }: { stage: Stage; q: string; onDrop: (leadId
     >
       <div className="flex items-center gap-2 px-3 py-3">
         <span className="h-2.5 w-2.5 rounded-full" style={{ background: stage.color }} />
-        <span className="font-display text-sm font-bold">{stage.name}</span>
+        <span className="text-sm font-semibold">{stage.name}</span>
         <span className="ml-auto font-mono text-xs text-mute">{data?.total ?? stage._count.leads}</span>
       </div>
       <div className="scroll-thin flex max-h-[calc(100vh-15rem)] flex-col gap-2 overflow-y-auto px-2 pb-2">
