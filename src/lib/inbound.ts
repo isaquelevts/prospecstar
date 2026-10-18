@@ -2,7 +2,7 @@ import { prisma } from "./db";
 import { chatIdToPhone, phoneToChatId } from "./phone";
 import { debounceJob } from "./queue";
 import { getSettings } from "./settings";
-import { waha } from "./waha";
+import { waha, wahaIdWhere } from "./waha";
 import { addActivity, createLeadIfNew, findLeadByPhone } from "./leads";
 import { fireTrigger, stopRunsForLead } from "./flows";
 import { resolveAgent } from "./ai";
@@ -20,7 +20,20 @@ type WahaMessage = {
   _data?: { notifyName?: string; pushName?: string; Info?: { PushName?: string } } & Record<string, unknown>;
 };
 
-export type WahaEvent = { event: string; session: string; payload: WahaMessage & { status?: string } };
+export type WahaEvent = { event: string; session: string; payload: WahaMessage & { status?: string; ack?: number; ackName?: string } };
+
+const ACK_STATUS: Record<number, string> = { [-1]: "failed", 1: "sent", 2: "delivered", 3: "read", 4: "read" };
+const STATUS_RANK: Record<string, number> = { pending: 0, sent: 1, delivered: 2, read: 3 };
+
+/** Confirmação de entrega/leitura de uma mensagem enviada por nós. Só avança o status (nunca volta). */
+async function handleAck(m: WahaEvent["payload"]) {
+  const status = ACK_STATUS[m.ack ?? -99];
+  if (!m.id || !status) return;
+  const msg = await prisma.message.findFirst({ where: { direction: "OUT", ...wahaIdWhere(m.id) } });
+  if (!msg) return;
+  if (status === "failed" ? msg.status === "read" : (STATUS_RANK[status] ?? 0) <= (STATUS_RANK[msg.status] ?? 0)) return;
+  await prisma.message.update({ where: { id: msg.id }, data: { status } });
+}
 
 const IGNORE = /@g\.us$|@broadcast$|@newsletter$|^status@/;
 
@@ -65,17 +78,28 @@ function messageText(m: WahaMessage) {
 }
 
 export async function handleWahaEvent(evt: WahaEvent) {
+  if (evt.event === "message.ack") return handleAck(evt.payload);
   if (evt.event !== "message.any" && evt.event !== "message") return;
   const m = evt.payload;
   const chatId = m.fromMe ? m.to : m.from;
   if (!chatId || IGNORE.test(chatId)) return;
-  if (m.id && (await prisma.message.findUnique({ where: { wahaId: m.id } }))) return; // já registrado
+  if (m.id && (await prisma.message.findFirst({ where: wahaIdWhere(m.id), select: { id: true } }))) return; // já registrado
 
   const text = messageText(m);
 
   // ---- mensagem enviada por nós ----
   if (m.fromMe) {
     if (m.source === "api") return; // enviada por este sistema; já registrada em sendToLead
+    // Algumas engines não informam `source` e o webhook pode chegar antes de o envio gravar o id:
+    // se há uma mensagem nossa idêntica e recente ainda sem id, é ela.
+    const recentOwn = await prisma.message.findFirst({
+      where: { direction: "OUT", body: text, wahaId: null, createdAt: { gte: new Date(Date.now() - 5 * 60_000) } },
+      orderBy: { createdAt: "desc" },
+    });
+    if (recentOwn) {
+      await prisma.message.update({ where: { id: recentOwn.id }, data: { wahaId: m.id } }).catch(() => null);
+      return;
+    }
     // enviada manualmente pelo celular / WhatsApp Web
     const found = await findOrCreateLead(evt.session, chatId, undefined, false);
     if (!found) return;

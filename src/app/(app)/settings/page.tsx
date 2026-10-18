@@ -1,83 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowDown, ArrowUp, ArrowRight, Smartphone, Trash2 } from "lucide-react";
 import { Button, Card, Field, Input, PageHeader, Toggle, api, useAction, useApi } from "@/components/ui";
 
 type Setting = { key: string; label: string; secret: boolean; value: string };
-type WA = { reachable: boolean; session: string; status: string; me?: { id: string; pushName?: string } | null; qr?: string | null; error?: string };
 type Stage = { id: string; name: string; color: string; isWon: boolean; isLost: boolean; _count: { leads: number } };
-
-const WA_STATUS: Record<string, string> = {
-  WORKING: "Conectado",
-  SCAN_QR_CODE: "Aguardando leitura do QR code",
-  STARTING: "Iniciando…",
-  STOPPED: "Parado",
-  FAILED: "Falhou — clique em Conectar de novo",
-  NOT_CREATED: "Ainda não conectado",
-  UNREACHABLE: "WAHA fora do ar ou URL/API key incorreta",
-};
 
 const BOOL_KEYS = ["PAUSE_AI_ON_HUMAN"];
 const GROUPS = [
-  { title: "Inteligência artificial", keys: ["OPENAI_API_KEY", "PAUSE_AI_ON_HUMAN", "OPT_OUT_KEYWORDS"] },
-  { title: "Captação", keys: ["APIFY_TOKEN", "GOOGLE_PLACES_KEY"] },
-  { title: "WAHA (WhatsApp)", keys: ["WAHA_URL", "WAHA_API_KEY", "WAHA_SESSION", "PUBLIC_URL"] },
+  { id: "ia", title: "Inteligência artificial", sub: "Chave da OpenAI e comportamento da IA nas conversas.", keys: ["OPENAI_API_KEY", "PAUSE_AI_ON_HUMAN", "OPT_OUT_KEYWORDS"] },
+  { id: "captacao", title: "Captação", sub: "Fontes de busca de empresas.", keys: ["APIFY_TOKEN", "GOOGLE_PLACES_KEY"] },
+  { id: "waha", title: "WAHA (WhatsApp)", sub: "Servidor que mantém a conexão com o WhatsApp.", keys: ["WAHA_URL", "WAHA_API_KEY", "WAHA_SESSION", "PUBLIC_URL"] },
 ];
-
-function WhatsAppCard() {
-  const { data, mutate } = useApi<WA>("/api/whatsapp", { refreshInterval: (d) => (d?.status === "WORKING" ? 30_000 : 4000) });
-  const { run, busy } = useAction();
-  const act = async (action: string, msg: string) => {
-    await run(() => api("/api/whatsapp", { body: { action } }), msg);
-    mutate();
-  };
-  const ok = data?.status === "WORKING";
-
-  return (
-    <Card className="p-5" >
-      <div id="whatsapp" className="flex flex-wrap items-start gap-6">
-        <div className="min-w-0 flex-1">
-          <h2 className="font-display text-lg font-bold">WhatsApp</h2>
-          <p className="mt-1 flex items-center gap-2 text-sm">
-            <span className={`h-2.5 w-2.5 rounded-full ${ok ? "bg-ok" : "bg-heat"}`} />
-            {WA_STATUS[data?.status ?? ""] ?? data?.status ?? "Verificando…"}
-            {ok && data?.me && <span className="text-mute">· {data.me.pushName} ({data.me.id.split("@")[0]})</span>}
-          </p>
-          {data?.error && <p className="mt-2 max-w-xl text-xs break-all text-bad">{data.error}</p>}
-          <p className="mt-3 max-w-xl text-xs text-mute">
-            Sessão <code className="font-mono">{data?.session}</code>. “Conectar” cria a sessão no WAHA já com o webhook deste sistema configurado. Depois, abra o WhatsApp no celular → Aparelhos conectados → Conectar aparelho, e leia o QR code.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button disabled={busy} onClick={() => act("connect", "Sessão iniciada")}>
-              {ok ? "Reconfigurar webhook" : "Conectar"}
-            </Button>
-            {ok && (
-              <>
-                <Button variant="outline" disabled={busy} onClick={() => act("stop", "Sessão parada")}>
-                  Parar
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="text-bad"
-                  disabled={busy}
-                  onClick={() => confirm("Desconectar este número do sistema?") && act("logout", "Número desconectado")}
-                >
-                  Desconectar número
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-        {data?.qr && (
-          <div className="rounded-xl border border-line bg-white p-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={data.qr} alt="QR code para conectar o WhatsApp" className="h-56 w-56" />
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-}
 
 function StagesCard() {
   const { data, mutate } = useApi<Stage[]>("/api/stages");
@@ -93,8 +29,8 @@ function StagesCard() {
   };
   return (
     <Card className="p-5">
-      <h2 className="mb-1 font-display text-lg font-bold">Etapas do funil</h2>
-      <p className="mb-4 text-xs text-mute">A primeira etapa recebe os leads novos. A etapa marcada como “perdido” recebe quem disser que não tem interesse.</p>
+      <h2 className="mb-1 font-semibold">Etapas do funil</h2>
+      <p className="text-muted-foreground mb-4 text-sm">A primeira etapa recebe os leads novos. A etapa marcada como “perdido” recebe quem disser que não tem interesse.</p>
       <ul className="space-y-2">
         {data?.map((s, i) => (
           <li key={s.id} className="flex flex-wrap items-center gap-2">
@@ -106,7 +42,7 @@ function StagesCard() {
                 await api(`/api/stages/${s.id}`, { method: "PATCH", body: { color: e.target.value } });
                 mutate();
               }}
-              className="h-8 w-8 cursor-pointer rounded border border-line"
+              className="size-9 cursor-pointer rounded-md border bg-transparent p-1"
             />
             <Input
               defaultValue={s.name}
@@ -118,7 +54,7 @@ function StagesCard() {
                 }
               }}
             />
-            <span className="w-16 font-mono text-xs text-mute">{s._count.leads} leads</span>
+            <span className="text-muted-foreground w-16 text-xs tabular-nums">{s._count.leads} leads</span>
             <Toggle
               checked={s.isWon}
               onChange={async (v) => {
@@ -135,22 +71,25 @@ function StagesCard() {
               }}
               label="perdido"
             />
-            <div className="ml-auto flex gap-1 text-xs">
-              <button disabled={i === 0} onClick={() => reorder(i, -1)} className="rounded px-1.5 text-mute hover:bg-ink/5 disabled:opacity-30" aria-label="Subir">
-                ↑
-              </button>
-              <button disabled={i === data.length - 1} onClick={() => reorder(i, 1)} className="rounded px-1.5 text-mute hover:bg-ink/5 disabled:opacity-30" aria-label="Descer">
-                ↓
-              </button>
-              <button
+            <div className="ml-auto flex gap-1">
+              <Button variant="ghost" size="sm" disabled={i === 0} onClick={() => reorder(i, -1)} aria-label="Subir">
+                <ArrowUp />
+              </Button>
+              <Button variant="ghost" size="sm" disabled={i === data.length - 1} onClick={() => reorder(i, 1)} aria-label="Descer">
+                <ArrowDown />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-destructive"
+                aria-label={`Excluir ${s.name}`}
                 onClick={async () => {
                   await run(() => api(`/api/stages/${s.id}`, { method: "DELETE" }), "Etapa excluída");
                   mutate();
                 }}
-                className="rounded px-1.5 text-mute hover:bg-bad-soft hover:text-bad"
               >
-                excluir
-              </button>
+                <Trash2 />
+              </Button>
             </div>
           </li>
         ))}
@@ -185,7 +124,16 @@ export default function SettingsPage() {
     <>
       <PageHeader title="Configurações" />
       <div className="space-y-6">
-        <WhatsAppCard />
+        <Link href="/whatsapp" className="hover:bg-accent/50 flex items-center gap-4 rounded-xl border p-5 shadow-sm transition-colors">
+          <span className="bg-whatsapp/15 text-whatsapp flex size-10 items-center justify-center rounded-lg">
+            <Smartphone className="size-5" />
+          </span>
+          <span className="flex-1">
+            <span className="block font-semibold">WhatsApp</span>
+            <span className="text-muted-foreground block text-sm">Conectar número, QR code, mensagem de teste e diagnóstico ficam na tela WhatsApp.</span>
+          </span>
+          <ArrowRight className="text-muted-foreground size-4" />
+        </Link>
 
         <Card className="p-5">
           <form
@@ -197,8 +145,9 @@ export default function SettingsPage() {
             className="space-y-8"
           >
             {GROUPS.map((g) => (
-              <section key={g.title}>
-                <h2 className="mb-4 font-display text-lg font-bold">{g.title}</h2>
+              <section key={g.title} id={g.id} className="scroll-mt-6">
+                <h2 className="font-semibold">{g.title}</h2>
+                <p className="text-muted-foreground mb-4 text-sm">{g.sub}</p>
                 <div className="grid gap-4 md:grid-cols-2">
                   {g.keys.map((key) => {
                     const s = data?.find((x) => x.key === key);

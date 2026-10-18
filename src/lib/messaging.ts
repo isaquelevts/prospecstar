@@ -47,10 +47,17 @@ export async function sendToLead(
         ? extractMessageId(await waha.sendText(session, chatId, text))
         : await sendHumanized(session, chatId, text);
     const now = new Date();
-    await prisma.message.update({
-      where: { id: msg.id },
-      data: { status: "sent", wahaId: typeof wahaId === "string" ? wahaId : null },
-    });
+    // o webhook pode ter chegado antes e já gravado o id / status de entrega nesta mensagem
+    const current = await prisma.message.findUnique({ where: { id: msg.id }, select: { status: true, wahaId: true } });
+    await prisma.message
+      .update({
+        where: { id: msg.id },
+        data: {
+          status: current && current.status !== "pending" ? current.status : "sent",
+          wahaId: current?.wahaId ?? (typeof wahaId === "string" ? wahaId : null),
+        },
+      })
+      .catch(() => prisma.message.update({ where: { id: msg.id }, data: { status: "sent" } }));
     await prisma.lead.update({ where: { id: leadId }, data: { lastOutboundAt: now, lastMessageAt: now } });
     return msg.id;
   } catch (e) {

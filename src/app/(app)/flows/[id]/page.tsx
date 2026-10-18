@@ -237,12 +237,12 @@ export default function FlowPage({ params }: { params: Promise<{ id: string }> }
           </Card>
 
           <Card className="mb-4 p-4">
-            <h2 className="font-display font-bold">Mapa da automação</h2>
+            <h2 className="font-semibold">Mapa da automação</h2>
             <p className="mb-3 text-xs text-mute">Arraste os blocos para organizar. Ligue os pontos para definir a sequência; em condições, a saída laranja é o caminho “Não”. Clique num bloco para editar.</p>
             <FlowCanvas graph={f} onChange={(graph) => set({ steps: graph.steps, triggerConfig: graph.triggerConfig })} selected={selected} onSelect={setSelected} />
           </Card>
           <Card className="p-4">
-            <h2 className="mb-3 font-display font-bold">Adicionar bloco</h2>
+            <h2 className="mb-3 font-semibold">Adicionar bloco</h2>
             <div className="flex flex-wrap gap-2">
             <Select value={adding} onChange={(e) => setAdding(e.target.value)} className="w-72">
               <option value="">Escolha um passo…</option>
@@ -256,7 +256,7 @@ export default function FlowPage({ params }: { params: Promise<{ id: string }> }
             </div>
           </Card>
           <Card className="mt-4 p-4">
-            <h2 className="mb-3 font-display font-bold">Configuração do bloco</h2>
+            <h2 className="mb-3 font-semibold">Configuração do bloco</h2>
             {selectedIndex < 0 ? <p className="text-sm text-mute">Selecione um bloco no mapa para ajustar mensagem, prazo ou condição.</p> : (
               <div>
                 <div className="mb-3 flex items-center justify-between gap-3">
@@ -276,7 +276,7 @@ export default function FlowPage({ params }: { params: Promise<{ id: string }> }
         <div className="space-y-4">
           <Card>
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
-              <h2 className="font-display font-bold">Execuções</h2>
+              <h2 className="font-semibold">Execuções</h2>
               <Button size="sm" variant="ghost" onClick={() => run(() => api(`/api/flows/${id}`, { body: {} }), (r: any) => `${r.stopped} execuções paradas`).then(() => mutate())}>
                 Parar todas
               </Button>

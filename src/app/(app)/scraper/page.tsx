@@ -134,7 +134,7 @@ export default function ScraperPage() {
 
         <Card>
           <div className="border-b border-line px-5 py-4">
-            <h2 className="font-display text-lg font-bold">Buscas</h2>
+            <h2 className="text-base font-semibold">Buscas</h2>
           </div>
           {!jobs?.length ? (
             <p className="p-8 text-center text-sm text-mute">Suas buscas aparecem aqui, com o progresso da importação.</p>

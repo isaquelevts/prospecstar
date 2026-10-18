@@ -33,6 +33,7 @@ export function renderTemplate(template: string, vars: Record<string, string>) {
 }
 
 export function pick<T>(arr: T[]): T {
+  if (!arr.length) throw new Error("Nenhuma opção para escolher (lista vazia).");
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
@@ -41,3 +42,12 @@ export function randomBetween(min: number, max: number) {
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Meia-noite de hoje no fuso configurado (TZ), como Date em UTC. */
+export function startOfToday() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hourCycle: "h23", hour: "numeric", minute: "numeric", second: "numeric" }).formatToParts(now);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  const elapsed = ((get("hour") * 60 + get("minute")) * 60 + get("second")) * 1000 + now.getMilliseconds();
+  return new Date(now.getTime() - elapsed);
+}

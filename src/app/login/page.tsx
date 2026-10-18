@@ -1,6 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { CircleAlert, LoaderCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -16,45 +22,48 @@ export default function LoginPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
-    });
+    }).catch(() => null);
     setBusy(false);
-    if (res.ok) window.location.href = "/";
-    else setError((await res.json().catch(() => ({}))).error ?? "Não foi possível entrar");
+    if (res?.ok) window.location.href = "/";
+    else setError((await res?.json().catch(() => ({})))?.error ?? "Não foi possível entrar");
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-ink px-4">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-2xl bg-card p-8 shadow-2xl">
-        <p className="font-display text-3xl font-extrabold tracking-tight">
-          prospec<span className="text-heat">.</span>
-        </p>
-        <p className="mt-1 mb-8 text-sm text-mute">Entre para ver seus leads e conversas.</p>
-        <label className="mb-4 block">
-          <span className="mb-1.5 block text-[13px] font-medium">E-mail</span>
-          <input
-            type="email"
-            required
-            autoFocus
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="h-11 w-full rounded-lg border border-line px-3 text-sm focus:border-cobalt focus:outline-none"
-          />
-        </label>
-        <label className="mb-6 block">
-          <span className="mb-1.5 block text-[13px] font-medium">Senha</span>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="h-11 w-full rounded-lg border border-line px-3 text-sm focus:border-cobalt focus:outline-none"
-          />
-        </label>
-        {error && <p className="mb-4 rounded-lg bg-bad-soft px-3 py-2 text-sm text-bad">{error}</p>}
-        <button disabled={busy} className="h-11 w-full rounded-lg bg-cobalt text-sm font-medium text-white hover:bg-[#1a32c4] disabled:opacity-60">
-          {busy ? "Entrando…" : "Entrar"}
-        </button>
-      </form>
+    <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
+      <div className="flex w-full max-w-sm flex-col gap-6">
+        <div className="flex items-center gap-2 self-center font-medium">
+          <span className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md text-xs font-bold">p.</span>
+          prospec.
+        </div>
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl">Bem-vindo de volta</CardTitle>
+            <CardDescription>Entre para ver seus leads e conversas.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={submit} className="grid gap-5">
+              <div className="grid gap-2">
+                <Label htmlFor="email">E-mail</Label>
+                <Input id="email" type="email" required autoFocus autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="password">Senha</Label>
+                <Input id="password" type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              </div>
+              {error && (
+                <Alert variant="destructive">
+                  <CircleAlert />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              <Button type="submit" disabled={busy} className="w-full">
+                {busy && <LoaderCircle className="animate-spin" />}
+                {busy ? "Entrando…" : "Entrar"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
