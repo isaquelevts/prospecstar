@@ -9,9 +9,9 @@ import { getSettings } from "./settings";
 
 /** Mensagens padrão de uma campanha nova: variações + spintax para nenhum lead receber o mesmo texto. */
 export const DEFAULT_TEMPLATES = [
-  "{{saudacao}}, tudo bem? Vi a {{nome}} no Google{, muito bem avaliada| e gostei das avaliações de vocês}! Vocês ainda fecham os horários das quadras pelo WhatsApp? {Trabalho com|Sou do} QuadrasFlow, um sistema onde o cliente reserva e paga o Pix sozinho, e você só acompanha a agenda. Posso te mostrar em 5 minutos?",
-  "{{saudacao_informal}}! {Encontrei|Achei} a {{nome}} {pesquisando no Google|no Google Maps}. {Uma dúvida rápida|Pergunta rápida}: hoje as reservas de {{modalidade}} são feitas pelo WhatsApp ou vocês já usam algum sistema? Pergunto porque {ajudo arenas a|o QuadrasFlow ajuda arenas a} {parar de perder tempo confirmando horário|automatizar reservas, Pix e mensalistas}.",
-  "{{saudacao}}! {Tudo certo por aí?|Tudo bem?} Vi a {{nome}} no Google. {Muitas arenas|Várias arenas} {que eu atendo|com quem converso} {perdiam horário vago e tempo no WhatsApp|passavam o dia respondendo \"tem horário?\"} — com o QuadrasFlow o cliente vê a agenda, reserva e paga sozinho. {Faz sentido eu te mostrar como funciona?|Posso te mandar um vídeo rápido de como funciona?}",
+  "{{saudacao}}, tudo bem? Aqui é o Isaque, do QuadrasFlow. Eu queria falar com o dono da {{nome}} — seria você?",
+  "{{saudacao_informal}}! Tudo bem? Sou o Isaque, do QuadrasFlow. Falo com o responsável pela {{nome}}?",
+  "{{saudacao}}! Aqui é o Isaque, do QuadrasFlow. Estou {conversando com|falando com} {algumas|várias} arenas aqui da região e queria trocar uma ideia rápida com o dono da {{nome}}. É você?",
 ];
 
 /** Quantas falhas seguidas pausam a campanha sozinha (protege o número e a lista). */
