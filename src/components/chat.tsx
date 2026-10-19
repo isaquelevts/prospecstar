@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Bot, Check, CheckCheck, CircleAlert, Clock, LoaderCircle, Megaphone, RotateCw, SendHorizontal, Sparkles, Workflow, Zap } from "lucide-react";
+import { Bot, Check, CheckCheck, CircleAlert, Clock, LoaderCircle, Megaphone, RotateCw, SendHorizontal, Sparkles, Workflow, X, Zap } from "lucide-react";
 import { api, useAction, useApi, useToast, Toggle } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +47,8 @@ function Media({ m }: { m: Msg }) {
     </a>
   );
 }
+
+type Suggestion = { agent: string; parts: string[]; actions: string[]; handoff: string | null; optOut: boolean; waitingClient: boolean };
 
 const AUTHOR: Record<string, { label: string; icon: typeof Bot }> = {
   ai: { label: "IA", icon: Sparkles },
@@ -180,6 +182,8 @@ export function ChatPanel({
   const [text, setText] = useState("");
   const [replies, setReplies] = useState<string[]>(DEFAULT_REPLIES);
   const [sending, setSending] = useState(false);
+  const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
   const { run, busy } = useAction();
   const toast = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -230,6 +234,31 @@ export function ChatPanel({
   }
 
   const list = messages ?? [];
+
+  // "o que a IA responderia?": mostra a sugestão sem enviar nada
+  async function suggest() {
+    if (suggesting) return;
+    setSuggesting(true);
+    setSuggestion(null);
+    try {
+      setSuggestion(await api<Suggestion>(`/api/leads/${leadId}/suggest`, { body: {} }));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), "error");
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  // envia as partes da sugestão como mensagens separadas, como a IA faria, sem perder o rascunho do campo
+  async function sendSuggestion(s: Suggestion) {
+    const draft = text;
+    setSuggestion(null);
+    for (const [i, part] of s.parts.entries()) {
+      if (i > 0) await new Promise((r) => setTimeout(r, 900));
+      await send(part);
+    }
+    setText(draft);
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -310,6 +339,73 @@ export function ChatPanel({
         </div>
       )}
 
+      {(suggesting || suggestion) && (
+        <div className="bg-muted/40 border-t px-4 py-3">
+          <div className="mb-2 flex items-center gap-2 text-xs">
+            <Sparkles className="size-3.5" />
+            <span className="font-medium">{suggesting ? "A IA está pensando…" : `O que ${suggestion?.agent} responderia`}</span>
+            {suggestion?.waitingClient && <span className="text-muted-foreground">· o cliente ainda não respondeu: sugestão de acompanhamento</span>}
+            <span className="ml-auto flex gap-1">
+              <Button type="button" variant="ghost" size="icon-sm" onClick={suggest} disabled={suggesting} aria-label="Gerar outra sugestão" title="Gerar outra">
+                <RotateCw className={suggesting ? "animate-spin" : ""} />
+              </Button>
+              <Button type="button" variant="ghost" size="icon-sm" onClick={() => setSuggestion(null)} aria-label="Descartar sugestão" title="Descartar">
+                <X />
+              </Button>
+            </span>
+          </div>
+          {suggesting ? (
+            <div className="text-muted-foreground flex items-center gap-2 py-3 text-sm">
+              <LoaderCircle className="size-4 animate-spin" /> Lendo a conversa e escrevendo a resposta…
+            </div>
+          ) : suggestion ? (
+            <>
+              {suggestion.parts.length ? (
+                <div className="max-h-56 space-y-1.5 overflow-y-auto">
+                  {suggestion.parts.map((p, i) => (
+                    <p key={i} className="bg-background w-fit max-w-[90%] rounded-2xl rounded-bl-md border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap shadow-xs">
+                      {p}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">A IA não escreveu nenhuma mensagem{suggestion.handoff ? " — ela transferiria para você" : ""}.</p>
+              )}
+              {(suggestion.actions.length > 0 || suggestion.handoff || suggestion.optOut) && (
+                <ul className="text-muted-foreground mt-2 space-y-0.5 text-xs">
+                  {suggestion.actions.map((a, i) => (
+                    <li key={i}>+ {a}</li>
+                  ))}
+                  {suggestion.handoff && <li>+ Transferiria para você: {suggestion.handoff}</li>}
+                  {suggestion.optOut && <li>+ Marcaria como sem interesse e encerraria o contato</li>}
+                </ul>
+              )}
+              {suggestion.parts.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setText(suggestion.parts.join("\n\n"));
+                      setSuggestion(null);
+                      setTimeout(() => inputRef.current?.focus(), 0);
+                    }}
+                  >
+                    Usar no campo para editar
+                  </Button>
+                  <Button type="button" size="sm" disabled={sending || !connected} onClick={() => sendSuggestion(suggestion)}>
+                    <SendHorizontal />
+                    Enviar{suggestion.parts.length > 1 ? ` (${suggestion.parts.length} mensagens)` : ""}
+                  </Button>
+                </div>
+              )}
+              <p className="text-muted-foreground mt-2 text-[11px]">Nada foi enviado. Só você decide se a resposta vai para o cliente.</p>
+            </>
+          ) : null}
+        </div>
+      )}
+
       <form
         className="bg-background flex items-end gap-2 border-t p-3"
         onSubmit={(e) => {
@@ -317,6 +413,14 @@ export function ChatPanel({
           send();
         }}
       >
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button type="button" variant="ghost" size="icon" onClick={suggest} disabled={suggesting || !list.length} aria-label="Ver o que a IA responderia">
+              {suggesting ? <LoaderCircle className="animate-spin" /> : <Sparkles />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Ver o que a IA responderia (sem enviar)</TooltipContent>
+        </Tooltip>
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>

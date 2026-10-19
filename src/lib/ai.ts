@@ -297,6 +297,54 @@ export async function replyToLead(leadId: string) {
   return { sent: text, actions: fx.log };
 }
 
+/** Traduz o registro de uma ferramenta ("mover_etapa({...})") para o que a IA faria, em português. */
+function describeAction(entry: string) {
+  const m = entry.match(/^(\w+)\((.*)\)$/s);
+  if (!m) return entry;
+  let a: Record<string, string> = {};
+  try {
+    a = JSON.parse(m[2]);
+  } catch {
+    return entry;
+  }
+  switch (m[1]) {
+    case "mover_etapa":
+      return `Moveria o lead para a etapa "${a.etapa}"`;
+    case "adicionar_tag":
+      return `Adicionaria a tag "${a.tag}"`;
+    case "salvar_informacao":
+      return `Salvaria no cadastro: ${a.campo} = ${a.valor}`;
+    default:
+      return entry;
+  }
+}
+
+/**
+ * "O que a IA responderia?": gera a resposta com a conversa real deste lead, mas não envia nada
+ * nem altera o lead. Funciona mesmo com a IA pausada para ele.
+ */
+export async function suggestReply(leadId: string) {
+  const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId }, include: { stage: true } });
+  const agent = await resolveAgent(lead.agentId);
+  if (!agent) throw new Error("Nenhum agente de IA ativo. Ative um agente na tela Agentes.");
+  const recent = await prisma.message.findMany({ where: { leadId, status: { not: "failed" } }, orderBy: { createdAt: "desc" }, take: agent.historyLimit });
+  if (!recent.length) throw new Error("Ainda não há conversa com este lead para a IA responder.");
+  const ordered = recent.reverse();
+  const waitingClient = ordered[ordered.length - 1].direction === "OUT";
+  const history = toApiHistory(ordered);
+  // nossa mensagem foi a última: pede o melhor acompanhamento em vez de responder ao vazio
+  if (waitingClient) history.push(user("[o cliente ainda não respondeu à nossa última mensagem — escreva a melhor próxima mensagem de acompanhamento, curta e sem pressão]"));
+  const { text, fx } = await runAgent(agent, lead, history, true);
+  return {
+    agent: agent.name,
+    parts: splitReply(text, agent.splitMessages),
+    actions: fx.log.map(describeAction),
+    handoff: fx.handoff ?? null,
+    optOut: !!fx.optOut,
+    waitingClient,
+  };
+}
+
 /** Gera uma mensagem única (sem ferramentas) — usado em fluxos para follow-ups personalizados. */
 export async function generateMessage(leadId: string, instruction: string, agentId?: string) {
   const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId }, include: { stage: true } });
