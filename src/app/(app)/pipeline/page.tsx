@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Heat, PageHeader, SiteBadge, api, timeAgo, useAction, useApi, Input } from "@/components/ui";
+import { Heat, PageHeader, ArenaBadge, api, timeAgo, useAction, useApi, Input } from "@/components/ui";
 
 type Stage = { id: string; name: string; color: string; _count: { leads: number } };
-type Lead = { id: string; name: string; city: string | null; category: string | null; score: number; websiteStatus: string | null; lastInboundAt: string | null; aiEnabled: boolean; unread: number };
+type Lead = { id: string; name: string; city: string | null; category: string | null; score: number; websiteStatus: string | null;
+  bookingStatus: string | null; lastInboundAt: string | null; aiEnabled: boolean; unread: number };
 
 function Column({ stage, q, onDrop }: { stage: Stage; q: string; onDrop: (leadId: string, stageId: string) => void }) {
   const { data } = useApi<{ items: Lead[]; total: number }>(`/api/leads?stageId=${stage.id}&pageSize=60&sort=recent&q=${encodeURIComponent(q)}`, {
@@ -47,7 +48,7 @@ function Column({ stage, q, onDrop }: { stage: Stage; q: string; onDrop: (leadId
             <p className="truncate text-xs text-mute">{[l.category, l.city].filter(Boolean).join(" · ") || "—"}</p>
             <div className="mt-2 flex items-center justify-between gap-2">
               <Heat score={l.score} showNumber={false} />
-              <SiteBadge status={l.websiteStatus} />
+              <ArenaBadge status={l.bookingStatus} />
             </div>
             {(l.lastInboundAt || l.aiEnabled) && (
               <p className="mt-1.5 text-[11px] text-mute">

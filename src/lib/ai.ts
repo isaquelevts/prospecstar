@@ -14,7 +14,7 @@ import type { Agent, Lead, Stage } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "./db";
 import { getSetting } from "./settings";
-import { WEBSITE_STATUS_LABEL } from "./website";
+import { BOOKING_STATUS_LABEL, MODALITY_LABEL } from "./arena";
 import { TZ, sleep } from "./template";
 
 export const DEFAULT_MODEL = "gpt-5-mini";
@@ -66,11 +66,13 @@ function leadContext(lead: Lead & { stage?: Stage | null }) {
     .join("\n");
   return [
     `Data/hora atual: ${now}`,
-    `\nDados do lead (empresa com quem você está conversando):`,
+    `\nDados do lead (arena com quem você está conversando):`,
     `- Nome: ${lead.name}`,
     lead.category && `- Segmento: ${lead.category}`,
     lead.city && `- Cidade: ${lead.city}${lead.state ? "/" + lead.state : ""}`,
-    `- Situação do site: ${WEBSITE_STATUS_LABEL[lead.websiteStatus ?? "NONE"] ?? lead.websiteStatus}${lead.website ? ` (${lead.website})` : ""}`,
+    lead.modalities.length > 0 && `- Modalidades: ${lead.modalities.map((m) => MODALITY_LABEL[m] ?? m).join(", ")}`,
+    lead.bookingStatus && `- Como reserva hoje (análise automática, confirme na conversa): ${BOOKING_STATUS_LABEL[lead.bookingStatus] ?? lead.bookingStatus}`,
+    lead.website && `- Site/rede: ${lead.website}`,
     lead.rating != null && `- Avaliação no Google: ${lead.rating} (${lead.reviewsCount ?? 0} avaliações)`,
     lead.stage && `- Etapa atual no funil: ${lead.stage.name}`,
     lead.tags.length > 0 && `- Tags: ${lead.tags.join(", ")}`,
@@ -153,7 +155,7 @@ function buildTools(agent: Agent, lead: Lead, stages: Stage[], simulate: boolean
       tool({
         name: "salvar_informacao",
         description:
-          "Salva uma informação coletada na conversa no cadastro do lead (ex: campo 'orcamento', 'prazo', 'tipo_de_site', 'email', 'nome_responsavel').",
+          "Salva uma informação coletada na conversa no cadastro do lead (ex: campo 'qtd_quadras', 'modalidades', 'como_reserva_hoje', 'sistema_atual', 'tem_mensalistas', 'nome_responsavel', 'decisor', 'melhor_horario_demo', 'email').",
         parameters: z.object({ campo: z.string(), valor: z.string() }),
         execute: async ({ campo, valor }) => {
           record("salvar_informacao", { campo, valor });
@@ -325,14 +327,16 @@ export async function simulateAgent(agentId: string, conversation: { role: "user
     (leadId && (await prisma.lead.findUnique({ where: { id: leadId }, include: { stage: true } }))) ||
     ({
       id: "sim",
-      name: "Padaria Pão Quente",
-      category: "Padaria",
+      name: "Arena Pé na Areia",
+      category: "Quadra de esportes",
       city: "Campinas",
       state: "SP",
       websiteStatus: "SOCIAL_ONLY",
-      website: "instagram.com/paoquente",
-      rating: 4.6,
-      reviewsCount: 230,
+      website: "instagram.com/arenapenaareia",
+      modalities: ["beach_tennis", "futevolei"],
+      bookingStatus: "WHATSAPP",
+      rating: 4.7,
+      reviewsCount: 180,
       tags: [],
       customData: {},
       stage: null,

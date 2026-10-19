@@ -105,7 +105,7 @@ function Playground({ agentId, beforeRun }: { agentId: string; beforeRun: () => 
           <p className="py-8 text-center text-sm text-mute">
             Simule a resposta de um lead, por exemplo:
             <br />
-            <em>“Oi, quanto custa um site?”</em>
+            <em>“Oi, quanto custa o sistema?”</em>
           </p>
         )}
         {turns.map((t, i) => (
@@ -215,7 +215,7 @@ export default function AgentPage({ params }: { params: Promise<{ id: string }> 
           <Card className="space-y-4 p-5">
             <Field
               label="Prompt do agente"
-              hint="Quem ele é, o objetivo da conversa, tom de voz e como conduzir até a venda. Os dados do lead (nome, segmento, situação do site) entram automaticamente."
+              hint="Quem ele é, o objetivo da conversa, tom de voz e como conduzir até a venda. Os dados do lead (nome, cidade, modalidades, como reserva hoje, avaliações) entram automaticamente."
             >
               <Textarea rows={14} value={a.systemPrompt} onChange={(e) => set({ systemPrompt: e.target.value })} className="font-mono text-[13px]" />
             </Field>

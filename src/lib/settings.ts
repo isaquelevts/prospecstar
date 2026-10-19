@@ -11,6 +11,7 @@ export const SETTING_KEYS = {
   PAUSE_AI_ON_HUMAN: "Pausar a IA do lead quando você responder pelo celular (true/false)",
   OPT_OUT_KEYWORDS: "Palavras de descadastro (separadas por vírgula)",
   DAILY_SEND_LIMIT: "Limite diário de disparos do número (somando todas as campanhas)",
+  COMPETITORS: "Sistemas de reserva concorrentes (separados por vírgula) — arenas que usam algum deles ficam marcadas como 'Usa concorrente'",
 } as const;
 
 export type SettingKey = keyof typeof SETTING_KEYS;
@@ -22,6 +23,7 @@ const DEFAULTS: Partial<Record<SettingKey, string>> = {
   PUBLIC_URL: "http://app:3000",
   PAUSE_AI_ON_HUMAN: "true",
   DAILY_SEND_LIMIT: "60",
+  COMPETITORS: "playtomic,aircourts",
   OPT_OUT_KEYWORDS: "sair,parar,pare,descadastrar,remover meu número,não me mande",
 };
 

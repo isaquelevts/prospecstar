@@ -3,7 +3,9 @@ import { prisma } from "../lib/db";
 import { QUEUES, queue, redis } from "../lib/queue";
 import { apifyGetItems, apifyGetRun, apifyStartRun, googlePlacesSearch, mapApifyItem } from "../lib/scrapers";
 import { createLeadIfNew, type LeadInput } from "../lib/leads";
-import { checkWebsite, computeScore } from "../lib/website";
+import { checkWebsite } from "../lib/website";
+import { bookingStatusFrom, computeArenaScore, detectModalities, looksLikeArena, type BookingSignals } from "../lib/arena";
+import { getSettings } from "../lib/settings";
 import { campaignTick } from "../lib/campaigns";
 import { replyToLead } from "../lib/ai";
 import { checkNoReplyFlows, executeRun } from "../lib/flows";
@@ -16,6 +18,11 @@ async function importItems(jobId: string, items: LeadInput[], tags: string[], re
   let imported = 0;
   let skipped = 0;
   for (const item of items) {
+    // a prospecção é para o QuadrasFlow: lojas, academias etc. que aparecem na busca ficam de fora
+    if (!looksLikeArena(item.name, item.category)) {
+      skipped++;
+      continue;
+    }
     const res = await createLeadIfNew({ ...item, tags }, { source: "scraper", scrapeJobId: jobId, requirePhone }).catch((e) => {
       log("erro importando item", e);
       return { created: false };
@@ -88,11 +95,22 @@ async function processScrape(job: Job<{ scrapeJobId: string }>) {
 async function processEnrich(job: Job<{ leadId: string }>) {
   const lead = await prisma.lead.findUnique({ where: { id: job.data.leadId } });
   if (!lead) return;
-  const check = await checkWebsite(lead.website);
-  const updated = { ...lead, websiteStatus: check.status };
+  const competitors = (await getSettings()).COMPETITORS.split(",").map((c) => c.trim()).filter(Boolean);
+  const check = await checkWebsite(lead.website, competitors);
+  const info = check.info as { title?: string; booking?: BookingSignals };
+  const modalities = detectModalities(lead.name, lead.category, info.title);
+  // contatos que não vieram da busca (WhatsApp, manuais) não têm site analisado como "sem site"
+  const websiteStatus = lead.source === "scraper" || lead.website ? check.status : null;
+  const bookingStatus = lead.source === "scraper" || lead.website ? bookingStatusFrom(websiteStatus, info) : null;
   await prisma.lead.update({
     where: { id: lead.id },
-    data: { websiteStatus: check.status, websiteInfo: check.info as object, score: computeScore(updated) },
+    data: {
+      websiteStatus,
+      websiteInfo: check.info as object,
+      modalities,
+      bookingStatus,
+      score: computeArenaScore({ ...lead, modalities, bookingStatus }),
+    },
   });
 }
 
@@ -124,6 +142,14 @@ async function main() {
     campaignQueue.add("tick", { campaignId: c.id, token: c.tickToken! }, { delay: 1000 }),
   ));
   // concorrência 1: os disparos de todas as campanhas saem em fila única, nunca em paralelo
+  // uma vez: reanalisa os leads existentes com a qualificação de arenas (QuadrasFlow)
+  const RESCORE = "MIGRATION_ARENA_SCORE_V1";
+  if (!(await prisma.setting.findUnique({ where: { key: RESCORE } }))) {
+    const all = await prisma.lead.findMany({ select: { id: true } });
+    await queue("enrich").addBulk(all.map((l) => ({ name: "enrich", data: { leadId: l.id } })));
+    await prisma.setting.create({ data: { key: RESCORE, value: new Date().toISOString() } });
+    log(`Reanalisando ${all.length} leads com a qualificação de arenas`);
+  }
   workers.push(worker<{ campaignId: string; token: string }>(QUEUES.campaign, (j) => campaignTick(j.data.campaignId, j.data.token), 1));
   await queue("cron").upsertJobScheduler("no-reply", { every: 10 * 60_000 }, { name: "no-reply" });
   log(`Worker iniciado: ${workers.length} filas`);

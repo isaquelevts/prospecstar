@@ -114,6 +114,9 @@ export type LeadFilter = {
   stageId?: string;
   tag?: string;
   websiteStatus?: string[];
+  bookingStatus?: string[];
+  modalities?: string[];
+  minReviews?: number;
   city?: string;
   category?: string;
   minScore?: number;
@@ -138,6 +141,9 @@ export function buildLeadWhere(f: LeadFilter): Prisma.LeadWhereInput {
   if (f.stageId) where.stageId = f.stageId;
   if (f.tag) where.tags = { has: f.tag.toLowerCase() };
   if (f.websiteStatus?.length) where.websiteStatus = { in: f.websiteStatus };
+  if (f.bookingStatus?.length) where.bookingStatus = { in: f.bookingStatus };
+  if (f.modalities?.length) where.modalities = { hasSome: f.modalities };
+  if (f.minReviews) where.reviewsCount = { gte: f.minReviews };
   if (f.city) where.city = { contains: f.city, mode: "insensitive" };
   if (f.category) where.category = { contains: f.category, mode: "insensitive" };
   if (f.minScore) where.score = { gte: f.minScore };
@@ -154,6 +160,9 @@ export function parseLeadFilter(sp: URLSearchParams): LeadFilter {
     stageId: sp.get("stageId") || undefined,
     tag: sp.get("tag") || undefined,
     websiteStatus: sp.get("websiteStatus")?.split(",").filter(Boolean),
+    bookingStatus: sp.get("bookingStatus")?.split(",").filter(Boolean),
+    modalities: sp.get("modalities")?.split(",").filter(Boolean),
+    minReviews: sp.get("minReviews") ? Number(sp.get("minReviews")) : undefined,
     city: sp.get("city") || undefined,
     category: sp.get("category") || undefined,
     minScore: sp.get("minScore") ? Number(sp.get("minScore")) : undefined,

@@ -38,7 +38,7 @@ export const POST = route(async (req) => {
   const data = CampaignInput.parse({
     name: `Campanha ${new Date().toLocaleDateString("pt-BR", { timeZone: process.env.TZ || "America/Sao_Paulo" })}`,
     templates: DEFAULT_TEMPLATES,
-    filter: { websiteStatus: ["NONE", "SOCIAL_ONLY", "OFFLINE"], neverContacted: true },
+    filter: { neverContacted: true },
     ...input,
   });
   const contacted = await prisma.stage.findUnique({ where: { name: "Contatado" } });

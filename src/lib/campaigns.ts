@@ -9,9 +9,9 @@ import { getSettings } from "./settings";
 
 /** Mensagens padrão de uma campanha nova: variações + spintax para nenhum lead receber o mesmo texto. */
 export const DEFAULT_TEMPLATES = [
-  "{{saudacao}}, tudo bem? Vi a {{nome}} no Google e {achei muito bem avaliada|gostei das avaliações de vocês}! Notei que vocês ainda não têm um site próprio. Posso te mostrar em 2 minutos como um site pode trazer mais clientes pra vocês?",
-  "{{saudacao_informal}}! {Encontrei|Achei} a {{nome}} {pesquisando no Google|no Google Maps} e {gostei bastante do que vi|vi que vocês são bem avaliados}. Vocês já pensaram em ter um site? {Faço sites para empresas da região|Trabalho com sites para negócios locais} e {posso te mostrar uns exemplos|queria te mostrar como funciona}, sem compromisso.",
-  "{{saudacao}}! {Tudo certo por aí?|Tudo bem?} Sou {desenvolvedor|criador} de sites e {vi|encontrei} a {{nome}} no Google. {Reparei|Percebi} que vocês ainda não têm site — {quer que eu te mostre|posso te mandar} {um exemplo|uma ideia} de como ficaria o de vocês?",
+  "{{saudacao}}, tudo bem? Vi a {{nome}} no Google{, muito bem avaliada| e gostei das avaliações de vocês}! Vocês ainda fecham os horários das quadras pelo WhatsApp? {Trabalho com|Sou do} QuadrasFlow, um sistema onde o cliente reserva e paga o Pix sozinho, e você só acompanha a agenda. Posso te mostrar em 5 minutos?",
+  "{{saudacao_informal}}! {Encontrei|Achei} a {{nome}} {pesquisando no Google|no Google Maps}. {Uma dúvida rápida|Pergunta rápida}: hoje as reservas de {{modalidade}} são feitas pelo WhatsApp ou vocês já usam algum sistema? Pergunto porque {ajudo arenas a|o QuadrasFlow ajuda arenas a} {parar de perder tempo confirmando horário|automatizar reservas, Pix e mensalistas}.",
+  "{{saudacao}}! {Tudo certo por aí?|Tudo bem?} Vi a {{nome}} no Google. {Muitas arenas|Várias arenas} {que eu atendo|com quem converso} {perdiam horário vago e tempo no WhatsApp|passavam o dia respondendo \"tem horário?\"} — com o QuadrasFlow o cliente vê a agenda, reserva e paga sozinho. {Faz sentido eu te mostrar como funciona?|Posso te mandar um vídeo rápido de como funciona?}",
 ];
 
 /** Quantas falhas seguidas pausam a campanha sozinha (protege o número e a lista). */
@@ -70,7 +70,17 @@ export async function globalDailyLimit() {
  * (sem opt-out, com telefone, com WhatsApp e que ainda não está conversando com você).
  */
 export function campaignAudienceWhere(filter: LeadFilter): Prisma.LeadWhereInput {
-  return { ...buildLeadWhere(filter), optOut: false, phone: { not: null }, waExists: { not: false }, lastInboundAt: null };
+  // "situação do site" era da venda de sites; campanhas antigas podem ter esse filtro salvo — ignorado
+  const { websiteStatus: _legacy, ...f } = filter ?? {};
+  return {
+    AND: [
+      buildLeadWhere(f),
+      { optOut: false, phone: { not: null }, waExists: { not: false }, lastInboundAt: null },
+      // quem já é cliente do QuadrasFlow não recebe prospecção
+      { OR: [{ bookingStatus: null }, { bookingStatus: { not: "CUSTOMER" } }] },
+      { OR: [{ stageId: null }, { stage: { isWon: false } }] },
+    ],
+  };
 }
 
 /** Adiciona à campanha os leads que batem com o filtro (ignora opt-out, sem telefone e já incluídos). */
@@ -125,11 +135,12 @@ export async function campaignTick(campaignId: string, token: string) {
   }
 }
 
-type LeadForSkip = { id: string; optOut: boolean; phone: string | null; waExists: boolean | null; lastInboundAt: Date | null; lastOutboundAt: Date | null };
+type LeadForSkip = { id: string; bookingStatus: string | null; optOut: boolean; phone: string | null; waExists: boolean | null; lastInboundAt: Date | null; lastOutboundAt: Date | null };
 
 /** Motivo para não mandar a campanha a este lead agora (já conversa, já recebeu outra campanha…). */
 async function skipReason(c: Campaign, lead: LeadForSkip) {
   if (lead.optOut) return "pediu para não receber mensagens";
+  if (lead.bookingStatus === "CUSTOMER") return "já é cliente do QuadrasFlow";
   if (!lead.phone || lead.waExists === false) return "sem WhatsApp";
   if (lead.lastInboundAt) return "já está conversando com você";
   if ((c.filter as LeadFilter | null)?.neverContacted && lead.lastOutboundAt) return "já foi contatado";

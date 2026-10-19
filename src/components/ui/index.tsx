@@ -9,6 +9,7 @@ import { useCallback, useId, useState } from "react";
 import useSWR, { type SWRConfiguration } from "swr";
 import { toast } from "sonner";
 import { WEBSITE_STATUS_LABEL } from "@/lib/website";
+import { BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL } from "@/lib/arena";
 import { cn } from "@/lib/utils";
 import { Button as ShadButton } from "./button";
 import { Input as ShadInput } from "./input";
@@ -192,7 +193,13 @@ export function SiteBadge({ status }: { status?: string | null }) {
   return <Badge color={STATUS_COLOR[status]}>{WEBSITE_STATUS_LABEL[status] ?? status}</Badge>;
 }
 
-/** Termômetro do lead: quanto mais quente, mais a empresa precisa de um site. */
+/** Como a arena reserva hoje (qualificação do QuadrasFlow). Contatos fora da busca não têm análise. */
+export function ArenaBadge({ status }: { status?: string | null }) {
+  if (!status) return null;
+  return <Badge color={BOOKING_STATUS_COLOR[status]}>{BOOKING_STATUS_LABEL[status] ?? status}</Badge>;
+}
+
+/** Termômetro do lead: quanto mais quente, mais a arena combina com o QuadrasFlow agora. */
 export function Heat({ score, showNumber = true }: { score: number; showNumber?: boolean }) {
   const hue = score >= 70 ? "var(--color-heat)" : score >= 45 ? "var(--color-warn)" : "var(--muted-foreground)";
   return (

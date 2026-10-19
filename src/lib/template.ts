@@ -1,4 +1,5 @@
 import type { Lead } from "@prisma/client";
+import { MODALITIES } from "./arena";
 
 export const TZ = process.env.TZ || "America/Sao_Paulo";
 
@@ -28,6 +29,8 @@ export function friendlyName(raw: string) {
 export function leadVariables(lead: Partial<Lead>): Record<string, string> {
   const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: TZ }).format(new Date()));
   const name = friendlyName(lead.name ?? "");
+  // modalidade principal da arena (ordem de MODALITIES); sem detecção, "quadras"
+  const mainModality = Object.keys(MODALITIES).find((k) => lead.modalities?.includes(k));
   return {
     nome: name,
     primeiro_nome: name.split(/\s+/)[0] ?? name,
@@ -39,10 +42,11 @@ export function leadVariables(lead: Partial<Lead>): Record<string, string> {
     avaliacoes: lead.reviewsCount?.toString() ?? "",
     saudacao: hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite",
     saudacao_informal: pick(["Oi", "Olá", "Opa"]),
+    modalidade: mainModality ? MODALITIES[mainModality].label : "quadras",
   };
 }
 
-export const TEMPLATE_VARIABLES = ["nome", "primeiro_nome", "cidade", "categoria", "site", "avaliacao", "avaliacoes", "saudacao", "saudacao_informal"];
+export const TEMPLATE_VARIABLES = ["nome", "primeiro_nome", "cidade", "categoria", "site", "avaliacao", "avaliacoes", "saudacao", "saudacao_informal", "modalidade"];
 
 /** Substitui {{variavel}} e resolve spintax {opção a|opção b|opção c}. */
 export function renderTemplate(template: string, vars: Record<string, string>) {

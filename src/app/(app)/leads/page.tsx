@@ -15,14 +15,14 @@ import {
   Modal,
   PageHeader,
   Select,
-  SiteBadge,
+  ArenaBadge,
   api,
   formatPhone,
   timeAgo,
   useAction,
   useApi,
 } from "@/components/ui";
-import { WEBSITE_STATUS_LABEL } from "@/lib/website";
+import { BOOKING_STATUS_LABEL, MODALITY_LABEL } from "@/lib/arena";
 
 type Lead = {
   id: string;
@@ -34,6 +34,7 @@ type Lead = {
   reviewsCount: number | null;
   website: string | null;
   websiteStatus: string | null;
+  bookingStatus: string | null;
   score: number;
   tags: string[];
   aiEnabled: boolean;
@@ -45,7 +46,7 @@ type Lead = {
 };
 type Stage = { id: string; name: string; color: string };
 
-const FILTER_KEYS = ["q", "stageId", "tag", "websiteStatus", "city", "category", "minScore", "hasPhone", "neverContacted", "scrapeJobId"];
+const FILTER_KEYS = ["q", "stageId", "tag", "websiteStatus", "bookingStatus", "modalities", "city", "category", "minScore", "hasPhone", "neverContacted", "scrapeJobId"];
 
 function LeadsInner() {
   const sp = useSearchParams();
@@ -82,7 +83,7 @@ function LeadsInner() {
   async function bulk(action: string, value?: string) {
     if (!count) return;
     if (action === "delete" && !confirm(`Excluir ${count} leads? Isso não pode ser desfeito.`)) return;
-    const payload = allMatching ? { filter: { ...filter, websiteStatus: filter.websiteStatus?.split(","), minScore: filter.minScore ? Number(filter.minScore) : undefined, hasPhone: !!filter.hasPhone, neverContacted: !!filter.neverContacted } } : { ids: [...selected] };
+    const payload = allMatching ? { filter: { ...filter, websiteStatus: filter.websiteStatus?.split(","), bookingStatus: filter.bookingStatus?.split(","), modalities: filter.modalities?.split(","), minScore: filter.minScore ? Number(filter.minScore) : undefined, hasPhone: !!filter.hasPhone, neverContacted: !!filter.neverContacted } } : { ids: [...selected] };
     await run(() => api<{ affected: number }>("/api/leads/bulk", { body: { ...payload, action, value } }), (r) => `${r.affected} leads atualizados`);
     setSelected(new Set());
     setAllMatching(false);
@@ -114,10 +115,17 @@ function LeadsInner() {
             </option>
           ))}
         </Select>
-        <Select value={filter.websiteStatus ?? ""} onChange={(e) => setF("websiteStatus", e.target.value)} aria-label="Situação do site">
-          <option value="">Qualquer situação de site</option>
-          <option value="NONE,SOCIAL_ONLY,OFFLINE">Precisa de site (quentes)</option>
-          {Object.entries(WEBSITE_STATUS_LABEL).map(([k, v]) => (
+        <Select value={filter.bookingStatus ?? ""} onChange={(e) => setF("bookingStatus", e.target.value)} aria-label="Como reserva hoje">
+          <option value="">Qualquer forma de reserva</option>
+          {Object.entries(BOOKING_STATUS_LABEL).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v}
+            </option>
+          ))}
+        </Select>
+        <Select value={filter.modalities ?? ""} onChange={(e) => setF("modalities", e.target.value)} aria-label="Modalidade">
+          <option value="">Qualquer modalidade</option>
+          {Object.entries(MODALITY_LABEL).map(([k, v]) => (
             <option key={k} value={k}>
               {v}
             </option>
@@ -232,7 +240,7 @@ function LeadsInner() {
                     <Heat score={l.score} />
                   </td>
                   <td className="px-2 py-2.5">
-                    <SiteBadge status={l.websiteStatus} />
+                    <ArenaBadge status={l.bookingStatus} />
                   </td>
                   <td className="px-2 py-2.5 font-mono text-xs">
                     {l.phone ? formatPhone(l.phone) : <span className="text-mute">—</span>}

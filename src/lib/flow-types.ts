@@ -25,7 +25,7 @@ export type FlowStep = (
   | { type: "ai_message"; instruction: string; agentId?: string }
   | { type: "wait"; amount: number; unit: "minutes" | "hours" | "days" }
   | { type: "stop_if_replied" }
-  | { type: "condition"; field: "websiteStatus" | "tag" | "stageId" | "score" | "city" | "category"; op: "eq" | "neq" | "gte" | "lte" | "contains"; value: string; onFail: "stop" | "skip_next" }
+  | { type: "condition"; field: "bookingStatus" | "websiteStatus" | "tag" | "stageId" | "score" | "city" | "category"; op: "eq" | "neq" | "gte" | "lte" | "contains"; value: string; onFail: "stop" | "skip_next" }
   | { type: "move_stage"; stageId: string }
   | { type: "add_tag"; tag: string }
   | { type: "remove_tag"; tag: string }
@@ -55,7 +55,7 @@ export function defaultStep(type: FlowStep["type"]): FlowStep {
     case "wait":
       return { type, amount: 1, unit: "days" };
     case "condition":
-      return { type, field: "websiteStatus", op: "eq", value: "NONE", onFail: "stop" };
+      return { type, field: "bookingStatus", op: "eq", value: "WHATSAPP", onFail: "stop" };
     case "move_stage":
       return { type, stageId: "" };
     case "add_tag":

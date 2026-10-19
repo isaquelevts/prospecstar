@@ -33,6 +33,8 @@ model Lead {
   website       String?
   websiteStatus String? // NONE | SOCIAL_ONLY | OFFLINE | NO_HTTPS | NOT_MOBILE | OK
   websiteInfo   Json?
+  modalities    String[]  @default([]) // beach_tennis | padel | futevolei | society | … (src/lib/arena.ts)
+  bookingStatus String? // como a arena reserva hoje: WHATSAPP | ONLINE | COMPETITOR | CUSTOMER | UNKNOWN
   address       String?
   city          String?
   state         String?

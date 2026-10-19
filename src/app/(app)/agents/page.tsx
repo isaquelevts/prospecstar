@@ -22,7 +22,7 @@ export default function AgentsPage() {
             onClick={async () => {
               const a = await run(() =>
                 api<{ id: string }>("/api/agents", {
-                  body: { name: "Novo agente", systemPrompt: "Você é um consultor comercial de uma agência que cria sites profissionais." },
+                  body: { name: "Novo agente", systemPrompt: "Você é consultor comercial do QuadrasFlow, sistema de reservas e gestão para arenas esportivas." },
                 }),
               );
               if (a) router.push(`/agents/${a.id}`);

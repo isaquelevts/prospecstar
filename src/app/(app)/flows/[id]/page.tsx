@@ -6,6 +6,7 @@ import { use, useEffect, useState } from "react";
 import { Badge, Button, Card, Field, Input, PageHeader, Select, Textarea, Toggle, api, timeAgo, useAction, useApi } from "@/components/ui";
 import { STEP_LABELS, TRIGGERS, defaultStep, type FlowStep, type TriggerConfig, type TriggerType } from "@/lib/flow-types";
 import { WEBSITE_STATUS_LABEL } from "@/lib/website";
+import { BOOKING_STATUS_LABEL } from "@/lib/arena";
 import { FlowCanvas, ensureGraph } from "@/components/flow-canvas";
 
 type Flow = { id: string; name: string; active: boolean; trigger: TriggerType; triggerConfig: TriggerConfig; steps: FlowStep[]; stopOnReply: boolean };
@@ -56,6 +57,7 @@ function StepEditor({ step, onChange, stages, agents }: { step: FlowStep; onChan
       return (
         <div className="grid gap-2 sm:grid-cols-4">
           <Select value={step.field} onChange={(e) => onChange({ ...step, field: e.target.value as "tag" })}>
+            <option value="bookingStatus">Como reserva hoje</option>
             <option value="websiteStatus">Situação do site</option>
             <option value="tag">Tem a tag</option>
             <option value="stageId">Etapa</option>
@@ -70,9 +72,9 @@ function StepEditor({ step, onChange, stages, agents }: { step: FlowStep; onChan
             <option value="gte">maior ou igual</option>
             <option value="lte">menor ou igual</option>
           </Select>
-          {step.field === "websiteStatus" ? (
+          {step.field === "websiteStatus" || step.field === "bookingStatus" ? (
             <Select value={step.value} onChange={(e) => onChange({ ...step, value: e.target.value })}>
-              {Object.entries(WEBSITE_STATUS_LABEL).map(([k, v]) => (
+              {Object.entries(step.field === "bookingStatus" ? BOOKING_STATUS_LABEL : WEBSITE_STATUS_LABEL).map(([k, v]) => (
                 <option key={k} value={k}>
                   {v}
                 </option>

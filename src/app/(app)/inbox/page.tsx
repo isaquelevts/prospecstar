@@ -18,7 +18,7 @@ import {
   Tag,
 } from "lucide-react";
 import { ChatPanel, MessageStatus } from "@/components/chat";
-import { Heat, SiteBadge, Toggle, api, formatPhone, initials, timeAgo, useAction, useApi } from "@/components/ui";
+import { Heat, ArenaBadge, Toggle, api, formatPhone, initials, timeAgo, useAction, useApi } from "@/components/ui";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,7 @@ type Lead = {
   category: string | null;
   website: string | null;
   websiteStatus: string | null;
+  bookingStatus: string | null;
   score: number;
   tags: string[];
   stageId: string | null;
@@ -202,7 +203,7 @@ function LeadPanel({ lead, onChange }: { lead: Lead; onChange: () => void }) {
           {(lead.category || lead.city) && <p className="text-muted-foreground mt-0.5 text-xs">{[lead.category, lead.city].filter(Boolean).join(" · ")}</p>}
         </div>
         <div className="flex flex-wrap justify-center gap-1.5">
-          <SiteBadge status={lead.websiteStatus} />
+          <ArenaBadge status={lead.bookingStatus} />
           {lead.optOut && <Badge variant="destructive">opt-out</Badge>}
           {lead.waExists === false && <Badge variant="destructive">sem WhatsApp</Badge>}
         </div>

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChatPanel } from "@/components/chat";
-import { Badge, Button, Card, Field, Heat, Input, Select, SiteBadge, Textarea, api, formatPhone, timeAgo, useAction, useApi } from "@/components/ui";
+import { MODALITY_LABEL } from "@/lib/arena";
+import { Badge, Button, Card, Field, Heat, Input, Select, ArenaBadge, Textarea, api, formatPhone, timeAgo, useAction, useApi } from "@/components/ui";
 
 type LeadDetail = {
   id: string;
@@ -13,6 +14,8 @@ type LeadDetail = {
   email: string | null;
   website: string | null;
   websiteStatus: string | null;
+  bookingStatus: string | null;
+  modalities: string[];
   websiteInfo: Record<string, unknown> | null;
   address: string | null;
   city: string | null;
@@ -69,7 +72,10 @@ export default function LeadPage({ params }: { params: Promise<{ id: string }> }
           <h1 className="text-2xl font-semibold tracking-tight">{lead.name}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
             <Heat score={lead.score} />
-            <SiteBadge status={lead.websiteStatus} />
+            <ArenaBadge status={lead.bookingStatus} />
+            {lead.modalities?.map((m) => (
+              <Badge key={m}>{MODALITY_LABEL[m] ?? m}</Badge>
+            ))}
             {lead.rating != null && (
               <span className="text-mute">
                 ★ {lead.rating} <span className="text-xs">({lead.reviewsCount} avaliações)</span>

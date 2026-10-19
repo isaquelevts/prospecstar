@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { Badge, Button, Card, Field, Input, PageHeader, Select, Textarea, Toggle, api, formatPhone, timeAgo, useAction, useApi } from "@/components/ui";
 import { CAMPAIGN_STATUS } from "@/components/labels";
-import { WEBSITE_STATUS_LABEL } from "@/lib/website";
+import { BOOKING_STATUS_LABEL, MODALITY_LABEL } from "@/lib/arena";
 import { TEMPLATE_VARIABLES } from "@/lib/template";
 
-type Filter = { stageId?: string; tag?: string; websiteStatus?: string[]; city?: string; category?: string; minScore?: number; neverContacted?: boolean; scrapeJobId?: string };
+type Filter = { stageId?: string; tag?: string; websiteStatus?: string[]; bookingStatus?: string[]; modalities?: string[]; minReviews?: number; city?: string; category?: string; minScore?: number; neverContacted?: boolean; scrapeJobId?: string };
 type Campaign = {
   id: string;
   name: string;
@@ -204,6 +204,9 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
               <Field label="Tag">
                 <Input value={c.filter.tag ?? ""} onChange={(e) => setFilter({ tag: e.target.value || undefined })} />
               </Field>
+              <Field label="Mínimo de avaliações no Google">
+                <Input type="number" min={0} value={c.filter.minReviews ?? ""} onChange={(e) => setFilter({ minReviews: e.target.value ? Number(e.target.value) : undefined })} />
+              </Field>
               <Field label="Temperatura mínima">
                 <Input type="number" min={0} max={100} value={c.filter.minScore ?? ""} onChange={(e) => setFilter({ minScore: e.target.value ? Number(e.target.value) : undefined })} />
               </Field>
@@ -217,28 +220,19 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
                 <Toggle checked={!!c.filter.neverContacted} onChange={(v) => setFilter({ neverContacted: v || undefined })} label="Só nunca contatados" />
               </div>
             </div>
-            <div className="mt-4">
-              <span className="mb-1.5 block text-[13px] font-medium">Situação do site</span>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(WEBSITE_STATUS_LABEL).map(([k, label]) => {
-                  const on = c.filter.websiteStatus?.includes(k);
-                  return (
-                    <button
-                      key={k}
-                      onClick={() => {
-                        const cur = new Set(c.filter.websiteStatus ?? []);
-                        if (on) cur.delete(k);
-                        else cur.add(k);
-                        setFilter({ websiteStatus: cur.size ? [...cur] : undefined });
-                      }}
-                      className={`rounded-lg border px-3 py-1.5 text-xs ${on ? "border-cobalt bg-cobalt-soft text-cobalt" : "border-line text-mute hover:border-ink/30"}`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <ChipGroup
+              label="Modalidade (qualquer uma das marcadas)"
+              options={MODALITY_LABEL}
+              value={c.filter.modalities}
+              onChange={(modalities) => setFilter({ modalities })}
+            />
+            <ChipGroup
+              label="Como reserva hoje"
+              options={Object.fromEntries(Object.entries(BOOKING_STATUS_LABEL).filter(([k]) => k !== "CUSTOMER"))}
+              value={c.filter.bookingStatus}
+              onChange={(bookingStatus) => setFilter({ bookingStatus })}
+            />
+            <p className="mt-2 text-xs text-mute">Clientes do QuadrasFlow e leads na etapa de ganho nunca entram nas campanhas.</p>
             <div className="mt-5 flex flex-wrap items-center gap-3 rounded-lg bg-paper px-4 py-3 text-sm">
               <span>
                 <strong className="font-display text-lg">{preview?.count ?? "…"}</strong> leads podem receber
@@ -386,5 +380,33 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
         </div>
       </div>
     </>
+  );
+}
+
+/** Grupo de botões liga/desliga para filtros de múltipla escolha. */
+function ChipGroup({ label, options, value, onChange }: { label: string; options: Record<string, string>; value?: string[]; onChange: (v: string[] | undefined) => void }) {
+  return (
+    <div className="mt-4">
+      <span className="mb-1.5 block text-[13px] font-medium">{label}</span>
+      <div className="flex flex-wrap gap-2">
+        {Object.entries(options).map(([k, text]) => {
+          const on = value?.includes(k);
+          return (
+            <button
+              key={k}
+              onClick={() => {
+                const cur = new Set(value ?? []);
+                if (on) cur.delete(k);
+                else cur.add(k);
+                onChange(cur.size ? [...cur] : undefined);
+              }}
+              className={`rounded-lg border px-3 py-1.5 text-xs ${on ? "border-cobalt bg-cobalt-soft text-cobalt" : "border-line text-mute hover:border-ink/30"}`}
+            >
+              {text}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

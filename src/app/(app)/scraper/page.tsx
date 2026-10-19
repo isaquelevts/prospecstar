@@ -31,7 +31,8 @@ const STATUS: Record<string, { label: string; color: string }> = {
   FAILED: { label: "Falhou", color: "#c9302c" },
 };
 
-const SUGGESTIONS = ["dentista", "advogado", "clínica de estética", "pet shop", "oficina mecânica", "salão de beleza", "restaurante", "academia", "contabilidade", "imobiliária"];
+// buscas que trazem arenas e quadras (o importador descarta lojas, academias etc.)
+const SUGGESTIONS = ["arena esportiva", "beach tennis", "futevôlei", "padel", "quadra society", "aluguel de quadra", "quadra de areia", "vôlei de praia", "centro esportivo", "quadra de futsal"];
 
 export default function ScraperPage() {
   const { data: jobs, mutate } = useApi<Job[]>("/api/scrape", { refreshInterval: 5000 });
@@ -94,9 +95,9 @@ export default function ScraperPage() {
               <>
                 <Field label="O que buscar" hint={provider === "apify_maps" ? "Um termo por linha para buscar vários de uma vez." : undefined}>
                   {provider === "apify_maps" ? (
-                    <Textarea required rows={3} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={"dentista\nclínica odontológica"} />
+                    <Textarea required rows={3} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={"beach tennis\narena esportiva"} />
                   ) : (
-                    <Input required value={query} onChange={(e) => setQuery(e.target.value)} placeholder="dentista em Campinas SP" />
+                    <Input required value={query} onChange={(e) => setQuery(e.target.value)} placeholder="beach tennis em Marabá PA" />
                   )}
                 </Field>
                 <div className="flex flex-wrap gap-1">
@@ -123,7 +124,7 @@ export default function ScraperPage() {
             )}
 
             <Field label="Tags para os leads" hint="Separadas por vírgula. Útil para filtrar a campanha depois.">
-              <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="ex: dentistas-campinas" />
+              <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="ex: arenas-maraba" />
             </Field>
             <Toggle checked={requirePhone} onChange={setRequirePhone} label="Importar só empresas com telefone" />
             <Button className="w-full" disabled={busy}>

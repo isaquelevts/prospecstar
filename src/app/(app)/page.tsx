@@ -5,12 +5,12 @@ import { Flame, MessagesSquare, Reply, Send, Users } from "lucide-react";
 import { Badge, Card, PageHeader, initials, timeAgo, useApi } from "@/components/ui";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { WEBSITE_STATUS_LABEL } from "@/lib/website";
+import { BOOKING_STATUS_LABEL } from "@/lib/arena";
 
 type Dash = {
   leads: number;
   withPhone: number;
-  noSite: number;
+  whatsappBooking: number;
   sentToday: number;
   inToday: number;
   sent7: number;
@@ -20,7 +20,7 @@ type Dash = {
   running: { id: string; name: string }[];
   stages: { id: string; name: string; color: string; count: number }[];
   recent: { id: string; name: string; lastInboundAt: string; unread: number; stage?: { name: string; color: string } | null }[];
-  byWebsiteStatus: { status: string; count: number }[];
+  byBookingStatus: { status: string; count: number }[];
 };
 
 function Stat({ label, value, note, icon: Icon }: { label: string; value: React.ReactNode; note?: string; icon: typeof Users }) {
@@ -51,7 +51,7 @@ export default function Dashboard() {
       </div>
     );
   const maxStage = Math.max(1, ...data.stages.map((s) => s.count));
-  const hot = data.byWebsiteStatus.filter((b) => ["NONE", "SOCIAL_ONLY", "OFFLINE"].includes(b.status));
+  const hot = data.byBookingStatus;
 
   return (
     <>
@@ -66,7 +66,7 @@ export default function Dashboard() {
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat icon={Users} label="Leads na base" value={data.leads.toLocaleString("pt-BR")} note={`${data.withPhone.toLocaleString("pt-BR")} com telefone`} />
-        <Stat icon={Flame} label="Sem site ou só rede social" value={data.noSite.toLocaleString("pt-BR")} note="seu público mais quente" />
+        <Stat icon={Flame} label="Arenas que reservam pelo WhatsApp" value={data.whatsappBooking.toLocaleString("pt-BR")} note="seu público mais quente" />
         <Stat icon={Send} label="Mensagens hoje" value={`${data.sentToday} / ${data.inToday}`} note="enviadas / recebidas" />
         <Stat icon={Reply} label="Taxa de resposta (7 dias)" value={`${data.replyRate}%`} note={`${data.replied7} de ${data.sent7} disparos`} />
       </div>
@@ -87,11 +87,11 @@ export default function Dashboard() {
           </div>
           {hot.length > 0 && (
             <div className="mt-6 flex flex-wrap gap-2 border-t border-line pt-4 text-xs text-mute">
-              Leads quentes por situação do site:
+              Arenas por forma de reserva:
               {hot.map((h) => (
-                <Link key={h.status} href={`/leads?websiteStatus=${h.status}`}>
+                <Link key={h.status} href={`/leads?bookingStatus=${h.status}`}>
                   <Badge className="bg-heat-soft text-heat">
-                    {WEBSITE_STATUS_LABEL[h.status]} · {h.count}
+                    {BOOKING_STATUS_LABEL[h.status] ?? h.status} · {h.count}
                   </Badge>
                 </Link>
               ))}
