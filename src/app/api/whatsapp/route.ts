@@ -69,9 +69,15 @@ export const POST = route(async (req) => {
       if (!process.env.WEBHOOK_SECRET) throw new Error("WEBHOOK_SECRET não configurado no .env — sem ele o sistema não recebe as mensagens.");
       await waha.upsertSession(session, webhookUrl(s.PUBLIC_URL));
       return { ok: true };
-    case "restart":
-      await waha.restartSession(session);
+    case "restart": {
+      // reinicia já aplicando a configuração atual (eventos do webhook, ignorar status/grupos)
+      const current = await waha.getSession(session).catch(() => null);
+      const hook = current?.config?.webhooks?.find((w) => w.url.includes("/api/webhooks/waha"));
+      const outdated = !hook || !WEBHOOK_EVENTS.every((e) => hook.events?.includes(e));
+      if (outdated && process.env.WEBHOOK_SECRET) await waha.upsertSession(session, webhookUrl(s.PUBLIC_URL));
+      else await waha.restartSession(session);
       return { ok: true };
+    }
     case "stop":
       await waha.stopSession(session);
       return { ok: true };

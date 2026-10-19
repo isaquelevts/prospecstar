@@ -361,7 +361,7 @@ function Check1({ ok, label, hint }: { ok: boolean | null | undefined; label: st
   );
 }
 
-function Diagnostics({ data }: { data?: WA }) {
+function Diagnostics({ data, onAction, busy }: { data?: WA; onAction: (action: string, msg: string) => void; busy: boolean }) {
   const d = data?.diagnostics;
   return (
     <Card>
@@ -382,8 +382,16 @@ function Diagnostics({ data }: { data?: WA }) {
           <Check1
             ok={data?.webhookOk}
             label="Webhook apontando para o sistema"
-            hint={data?.webhookOk === false ? "clique em Reconfigurar webhook" : d ? `${d.publicUrl}/api/webhooks/waha` : undefined}
+            hint={data?.webhookOk === false ? "faltam eventos ou o endereço mudou — clique em Reconfigurar webhook" : d ? `${d.publicUrl}/api/webhooks/waha` : undefined}
           />
+          {data?.webhookOk === false && (
+            <li className="pl-8">
+              <Button size="sm" variant="outline" disabled={busy} onClick={() => onAction("connect", "Webhook reconfigurado — o WhatsApp reconecta em instantes")}>
+                <RefreshCw />
+                Reconfigurar webhook
+              </Button>
+            </li>
+          )}
         </ul>
       </CardContent>
     </Card>
@@ -476,7 +484,7 @@ export default function WhatsAppPage() {
 
         <div className="grid gap-6">
           <TestMessage connected={data?.status === "WORKING"} warmUntil={data?.warmUntil} />
-          <Diagnostics data={data} />
+          <Diagnostics data={data} onAction={act} busy={busy} />
           <Tips />
         </div>
       </div>
