@@ -206,6 +206,34 @@ async function migrateScriptV2() {
   console.log("Roteiro do QuadrasFlow aplicado ao agente e aos follow-ups");
 }
 
+/** md5 do prompt do agente na primeira versão (venda por mensagem de texto), para saber se ninguém o editou. */
+const PROMPT_V1_MD5 = "57799c5a4ca8a2ffa4da62bc20562b8e";
+
+const DEMO_SECTION = `
+
+## 6. Demonstração (acrescentado pelo roteiro do Isaque)
+
+- Formato: chamada de vídeo de 15 minutos, com compartilhamento de tela, mostrando como um cliente reservaria uma quadra na arena dele. Sem compromisso.
+- Horários de demonstração a oferecer (segunda a sexta): manhã às 10h e tarde às 15h. Ofereça sempre dois horários nos próximos dias úteis. [AJUSTE conforme sua agenda]
+- Depois que o responsável escolher, o agente confirma o dia e o horário e transfere para o Isaque enviar o link da chamada. O agente não envia link por conta própria.
+- Esta seção é a exceção à regra 8: oferecer esses horários de demonstração é permitido.`;
+
+/** Uma vez: o prompt do roteiro entra se o prompt não foi editado; a sua base de conhecimento só ganha a seção de demonstração. */
+async function migrateScriptV3() {
+  const FLAG = "MIGRATION_QUADRASFLOW_SCRIPT_V3";
+  if (await prisma.setting.findUnique({ where: { key: FLAG } })) return;
+  const { createHash } = await import("node:crypto");
+  const agent = await prisma.agent.findFirst({ where: { name: AGENT_NAME } });
+  if (agent) {
+    const data: { systemPrompt?: string; knowledge?: string } = {};
+    if (createHash("md5").update(agent.systemPrompt).digest("hex") === PROMPT_V1_MD5) data.systemPrompt = PROMPT;
+    if (!agent.knowledge.includes("## 6. Demonstração")) data.knowledge = agent.knowledge.trimEnd() + DEMO_SECTION;
+    if (Object.keys(data).length) await prisma.agent.update({ where: { id: agent.id }, data });
+  }
+  await prisma.setting.create({ data: { key: FLAG, value: new Date().toISOString() } });
+  console.log("Roteiro do Isaque aplicado ao prompt e à base de conhecimento do agente");
+}
+
 async function main() {
   if ((await prisma.stage.count()) === 0) {
     await prisma.stage.createMany({ data: STAGES.map((s, i) => ({ ...s, order: i })) });
@@ -213,6 +241,7 @@ async function main() {
   }
   await migrateToQuadrasFlow();
   await migrateScriptV2();
+  await migrateScriptV3();
 }
 
 main()
