@@ -8,9 +8,9 @@ import { Button, Card, Field, Input, PageHeader, Toggle, api, useAction, useApi 
 type Setting = { key: string; label: string; secret: boolean; value: string };
 type Stage = { id: string; name: string; color: string; isWon: boolean; isLost: boolean; _count: { leads: number } };
 
-const BOOL_KEYS = ["PAUSE_AI_ON_HUMAN"];
+const BOOL_KEYS = ["PAUSE_AI_ON_HUMAN", "REGISTER_UNKNOWN_CONTACTS"];
 const GROUPS = [
-  { id: "ia", title: "Inteligência artificial", sub: "Chave da OpenAI e comportamento da IA nas conversas.", keys: ["OPENAI_API_KEY", "PAUSE_AI_ON_HUMAN", "OPT_OUT_KEYWORDS"] },
+  { id: "ia", title: "Inteligência artificial", sub: "Chave da OpenAI e comportamento da IA nas conversas.", keys: ["OPENAI_API_KEY", "PAUSE_AI_ON_HUMAN", "REGISTER_UNKNOWN_CONTACTS", "OPT_OUT_KEYWORDS"] },
   { id: "disparos", title: "Disparos", sub: "Proteção do número: teto de mensagens de campanha por dia, somando todas as campanhas.", keys: ["DAILY_SEND_LIMIT", "COMPETITORS"] },
   { id: "captacao", title: "Captação", sub: "Fontes de busca de empresas.", keys: ["APIFY_TOKEN", "GOOGLE_PLACES_KEY"] },
   { id: "waha", title: "WAHA (WhatsApp)", sub: "Servidor que mantém a conexão com o WhatsApp.", keys: ["WAHA_URL", "WAHA_API_KEY", "WAHA_SESSION", "PUBLIC_URL"] },

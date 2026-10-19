@@ -149,8 +149,10 @@ export async function handleWahaEvent(evt: WahaEvent) {
 
   // ---- mensagem recebida do contato ----
   const pushName = m._data?.notifyName || m._data?.pushName || m._data?.Info?.PushName;
-  const found = await findOrCreateLead(evt.session, chatId, typeof pushName === "string" ? pushName : undefined);
-  if (!found) return;
+  // Quem não é lead do sistema (amigos, família, outros contatos do seu WhatsApp) só é registrado se a opção estiver ligada
+  const registerUnknown = (await getSettings()).REGISTER_UNKNOWN_CONTACTS === "true";
+  const found = await findOrCreateLead(evt.session, chatId, typeof pushName === "string" ? pushName : undefined, registerUnknown);
+  if (!found) return void console.info("[waha] mensagem de número que não é lead: ignorada", { id: m.id });
   const { lead, created } = found;
 
   const now = new Date();

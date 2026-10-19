@@ -10,6 +10,7 @@ export const SETTING_KEYS = {
   PUBLIC_URL: "URL que o WAHA usa para chamar este sistema (dentro do Docker: http://app:3000)",
   PAUSE_AI_ON_HUMAN: "Pausar a IA do lead quando você responder pelo celular (true/false)",
   OPT_OUT_KEYWORDS: "Palavras de descadastro (separadas por vírgula)",
+  REGISTER_UNKNOWN_CONTACTS: "Registrar como lead quem te escrever sem ser lead do sistema (true/false). Desligado: conversas pessoais ficam fora do sistema",
   DAILY_SEND_LIMIT: "Limite diário de disparos do número (somando todas as campanhas)",
   COMPETITORS: "Sistemas de reserva concorrentes (separados por vírgula) — arenas que usam algum deles ficam marcadas como 'Usa concorrente'",
 } as const;
@@ -22,6 +23,7 @@ const DEFAULTS: Partial<Record<SettingKey, string>> = {
   WAHA_SESSION: "default",
   PUBLIC_URL: "http://app:3000",
   PAUSE_AI_ON_HUMAN: "true",
+  REGISTER_UNKNOWN_CONTACTS: "false",
   DAILY_SEND_LIMIT: "60",
   COMPETITORS: "playtomic,aircourts",
   OPT_OUT_KEYWORDS: "sair,parar,pare,descadastrar,remover meu número,não me mande",
