@@ -74,7 +74,8 @@ export function campaignAudienceWhere(filter: LeadFilter): Prisma.LeadWhereInput
   return {
     AND: [
       buildLeadWhere(f),
-      { optOut: false, phone: { not: null }, waExists: { not: false }, lastInboundAt: null },
+      // "não verificado" (null) também conta: o Prisma `not: false` descartaria os nulos
+      { optOut: false, phone: { not: null }, lastInboundAt: null, OR: [{ waExists: null }, { waExists: true }] },
       // quem já é cliente do QuadrasFlow não recebe prospecção
       { OR: [{ bookingStatus: null }, { bookingStatus: { not: "CUSTOMER" } }] },
       { OR: [{ stageId: null }, { stage: { isWon: false } }] },
@@ -85,7 +86,7 @@ export function campaignAudienceWhere(filter: LeadFilter): Prisma.LeadWhereInput
 /** Adiciona à campanha os leads que batem com o filtro (ignora opt-out, sem telefone e já incluídos). */
 export async function populateTargets(campaignId: string, filter: LeadFilter, leadIds?: string[]) {
   const where = leadIds?.length
-    ? { id: { in: leadIds }, optOut: false, phone: { not: null }, waExists: { not: false } }
+    ? { id: { in: leadIds }, optOut: false, phone: { not: null }, OR: [{ waExists: null }, { waExists: true }] }
     : campaignAudienceWhere(filter);
   const leads = await prisma.lead.findMany({
     where,
