@@ -23,8 +23,30 @@ export type Msg = {
   author: string;
   status: string;
   error?: string | null;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
   createdAt: string;
 };
+
+/** Imagem, áudio ou vídeo da mensagem (o arquivo é servido pelo app em /api/messages/:id/media). */
+function Media({ m }: { m: Msg }) {
+  const src = `/api/messages/${m.id}/media`;
+  const type = m.mediaType ?? "";
+  if (type.startsWith("image/"))
+    return (
+      <a href={src} target="_blank" rel="noreferrer" className="-mx-1 -mt-0.5 mb-1 block">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt="Imagem da conversa" loading="lazy" className="max-h-72 w-full rounded-xl object-cover" />
+      </a>
+    );
+  if (type.startsWith("audio/")) return <audio src={src} controls preload="none" className="mb-1 h-10 max-w-full" />;
+  if (type.startsWith("video/")) return <video src={src} controls preload="metadata" className="mb-1 max-h-72 rounded-xl" />;
+  return (
+    <a href={src} target="_blank" rel="noreferrer" className="mb-1 block underline">
+      Abrir arquivo
+    </a>
+  );
+}
 
 const AUTHOR: Record<string, { label: string; icon: typeof Bot }> = {
   ai: { label: "IA", icon: Sparkles },
@@ -110,7 +132,8 @@ function Bubble({ m, onRetry, retrying }: { m: Msg; onRetry: (id: string) => voi
               {author.label}
             </span>
           )}
-          {m.body}
+          {m.mediaUrl && <Media m={m} />}
+          {!(m.mediaUrl && m.body.startsWith("[mídia")) && m.body}
           <span className={cn("float-right mt-1.5 ml-3 flex translate-y-0.5 items-center gap-1 text-[10px] tabular-nums", out ? "text-primary-foreground/60" : "text-muted-foreground")}>
             {time}
             {out && <MessageStatus status={m.status} />}
@@ -153,6 +176,7 @@ export function ChatPanel({
   connected?: boolean;
 }) {
   const { data: messages, mutate } = useApi<Msg[]>(`/api/leads/${leadId}/messages`, { refreshInterval: 3000 });
+  const { data: presence } = useApi<{ typing: boolean }>(`/api/leads/${leadId}/typing`, { refreshInterval: connected === false ? 0 : 2500 });
   const [text, setText] = useState("");
   const [replies, setReplies] = useState<string[]>(DEFAULT_REPLIES);
   const [sending, setSending] = useState(false);
@@ -172,7 +196,7 @@ export function ChatPanel({
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [messages, presence?.typing]);
 
   async function send(body = text) {
     const t = body.trim();
@@ -268,6 +292,11 @@ export function ChatPanel({
               </Fragment>
             );
           })}
+          {presence?.typing && (
+            <div className="flex justify-start">
+              <span className="bg-background text-muted-foreground animate-pulse rounded-2xl rounded-bl-md border px-3 py-2 text-xs shadow-xs">digitando…</span>
+            </div>
+          )}
         </div>
       </div>
 

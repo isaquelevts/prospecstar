@@ -1,7 +1,18 @@
 import type { Lead } from "@prisma/client";
 import { prisma } from "./db";
+import { redis } from "./queue";
 import { phoneToChatId } from "./phone";
 import { assertSessionReady, defaultSession, extractMessageId, sendHumanized, waha } from "./waha";
+
+/** Assina a presença do chat (digitando…) uma vez por hora. */
+export async function ensurePresence(session: string, chatId: string) {
+  try {
+    const first = await redis().set(`presub:${session}:${chatId}`, "1", "EX", 3600, "NX");
+    if (first) await waha.subscribePresence(session, chatId);
+  } catch {
+    // opcional: sem isso só some o "digitando…" na inbox
+  }
+}
 
 /** Garante que o lead tem WhatsApp e um chatId válido. Retorna null se o número não existir. */
 export async function resolveChatId(lead: Lead, session: string): Promise<string | null> {
@@ -38,6 +49,7 @@ export async function sendToLead(
   await assertSessionReady(session);
   const chatId = await resolveChatId(lead, session);
   if (!chatId) throw new Error("Número não tem WhatsApp.");
+  void ensurePresence(session, chatId);
 
   const msg = await prisma.message.create({
     data: { leadId, direction: "OUT", body: text, author, status: "pending" },

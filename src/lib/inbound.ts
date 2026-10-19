@@ -3,6 +3,7 @@ import { chatIdToPhone, phoneToChatId } from "./phone";
 import { debounceJob } from "./queue";
 import { getSettings } from "./settings";
 import { markSessionStatus, waha, wahaIdWhere } from "./waha";
+import { redis } from "./queue";
 import { addActivity, createLeadIfNew, findLeadByPhone } from "./leads";
 import { fireTrigger, stopRunsForLead } from "./flows";
 import { resolveAgent } from "./ai";
@@ -16,9 +17,21 @@ type WahaMessage = {
   hasMedia?: boolean;
   source?: "app" | "api";
   timestamp?: number;
-  media?: { mimetype?: string } | null;
+  media?: { url?: string; mimetype?: string; filename?: string } | null;
   _data?: { notifyName?: string; pushName?: string; Info?: { PushName?: string } } & Record<string, unknown>;
 };
+
+/** Caminho do arquivo no WAHA + tipo, quando a mensagem trouxe mídia já baixada. */
+function mediaOf(m: WahaMessage) {
+  const url = m.media?.url;
+  if (!m.hasMedia || !url) return {};
+  try {
+    const u = new URL(url, "http://waha");
+    return { mediaUrl: u.pathname + u.search, mediaType: m.media?.mimetype ?? null };
+  } catch {
+    return {};
+  }
+}
 
 export type WahaEvent = { event: string; session: string; payload: WahaMessage & { status?: string; ack?: number; ackName?: string } };
 
@@ -77,13 +90,31 @@ function messageText(m: WahaMessage) {
   return "[mensagem sem texto]";
 }
 
+type PresencePayload = { id?: string; presences?: Array<{ lastKnownPresence?: string }> };
+
+/** O contato está digitando/gravando áudio: guarda por poucos segundos para a inbox mostrar. */
+async function handlePresence(session: string, p: PresencePayload) {
+  const chatId = p?.id;
+  if (!chatId || IGNORE.test(chatId)) return;
+  const active = p.presences?.some((x) => x.lastKnownPresence === "typing" || x.lastKnownPresence === "recording");
+  const found = await findOrCreateLead(session, chatId, undefined, false);
+  if (!found) return;
+  const key = `typing:${found.lead.id}`;
+  if (active) await redis().set(key, "1", "EX", 8);
+  else await redis().del(key);
+}
+
 export async function handleWahaEvent(evt: WahaEvent) {
   if (evt.event === "message.ack") return handleAck(evt.payload);
   if (evt.event === "session.status") return markSessionStatus(evt.session, evt.payload?.status);
+  if (evt.event === "presence.update") return handlePresence(evt.session, evt.payload as unknown as PresencePayload);
   if (evt.event !== "message.any" && evt.event !== "message") return;
   const m = evt.payload;
   const chatId = m.fromMe ? m.to : m.from;
-  if (!chatId || IGNORE.test(chatId)) return;
+  // só metadados (nunca o texto) para entender por que um evento foi descartado
+  const meta = { id: m.id, from: m.from, to: m.to, fromMe: m.fromMe, hasMedia: !!m.hasMedia, source: m.source };
+  if (!chatId) return void console.warn("[waha] mensagem ignorada: sem chatId", meta);
+  if (IGNORE.test(chatId)) return void console.info("[waha] mensagem ignorada: chat de grupo/status/canal", meta);
   if (m.id && (await prisma.message.findFirst({ where: wahaIdWhere(m.id), select: { id: true } }))) return; // já registrado
 
   const text = messageText(m);
@@ -105,7 +136,7 @@ export async function handleWahaEvent(evt: WahaEvent) {
     const found = await findOrCreateLead(evt.session, chatId, undefined, false);
     if (!found) return;
     const { lead } = found;
-    await prisma.message.create({ data: { leadId: lead.id, direction: "OUT", body: text, wahaId: m.id, author: "human" } });
+    await prisma.message.create({ data: { leadId: lead.id, direction: "OUT", body: text, wahaId: m.id, author: "human", ...mediaOf(m) } });
     const s = await getSettings();
     const pause = s.PAUSE_AI_ON_HUMAN === "true" && lead.aiEnabled;
     await prisma.lead.update({
@@ -124,7 +155,7 @@ export async function handleWahaEvent(evt: WahaEvent) {
 
   const now = new Date();
   await prisma.message.create({
-    data: { leadId: lead.id, direction: "IN", body: text, wahaId: m.id, author: "contact", status: "received" },
+    data: { leadId: lead.id, direction: "IN", body: text, wahaId: m.id, author: "contact", status: "received", ...mediaOf(m) },
   });
   await prisma.lead.update({
     where: { id: lead.id },

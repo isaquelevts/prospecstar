@@ -9,11 +9,12 @@ const Send = z.object({
   phone: z.string().min(8),
   text: z.string().trim().min(1, "Escreva a mensagem"),
   name: z.string().trim().optional(),
+  humanize: z.boolean().optional(),
 });
 
 /** Inicia uma conversa com qualquer número: usa o lead existente ou cria um novo. */
 export const POST = route(async (req) => {
-  const { phone: raw, text, name } = Send.parse(await body(req));
+  const { phone: raw, text, name, humanize } = Send.parse(await body(req));
   const phone = normalizePhone(raw);
   if (!phone) throw new Error("Telefone inválido. Use DDD + número, ex: 11 99999-8888.");
 
@@ -26,7 +27,7 @@ export const POST = route(async (req) => {
   }
   if (!lead) throw new Error("Não foi possível criar o contato.");
   try {
-    await sendToLead(lead.id, text, "human", { humanize: false });
+    await sendToLead(lead.id, text, "human", { humanize: humanize ?? false });
   } catch (e) {
     // número sem WhatsApp: não deixa um lead vazio criado só para esta tentativa
     if (created && String(e).includes("não tem WhatsApp")) await prisma.lead.delete({ where: { id: lead.id } }).catch(() => null);

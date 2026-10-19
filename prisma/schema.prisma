@@ -77,6 +77,8 @@ model Message {
   direction String // IN | OUT
   body      String
   wahaId    String?  @unique
+  mediaUrl  String? // caminho do arquivo no WAHA (servido por /api/messages/:id/media)
+  mediaType String? // mimetype, ex: image/jpeg
   author    String   @default("human") // contact | human | ai | campaign | flow
   status    String   @default("sent") // pending | sent | failed | received
   error     String?

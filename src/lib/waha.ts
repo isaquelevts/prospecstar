@@ -66,7 +66,7 @@ export type WahaSession = {
   config?: { webhooks?: Array<{ url: string; events: string[] }> } | null;
 };
 
-export const WEBHOOK_EVENTS = ["message.any", "message.ack", "session.status"];
+export const WEBHOOK_EVENTS = ["message.any", "message.ack", "session.status", "presence.update"];
 
 /**
  * Logo depois de ler o QR o WhatsApp Web ainda sincroniza e recarrega a página. Um comando nesse intervalo
@@ -149,6 +149,9 @@ export const waha = {
 
   sendText: (session: string, chatId: string, text: string) =>
     call<unknown>("/api/sendText", { method: "POST", body: JSON.stringify({ session, chatId, text }) }),
+  /** Passa a receber `presence.update` (digitando, online…) deste chat. */
+  subscribePresence: (session: string, chatId: string) =>
+    call(`/api/${encodeURIComponent(session)}/presence/${encodeURIComponent(chatId)}/subscribe`, { method: "POST" }).catch(() => null),
   startTyping: (session: string, chatId: string) =>
     call("/api/startTyping", { method: "POST", body: JSON.stringify({ session, chatId }) }).catch(() => null),
   stopTyping: (session: string, chatId: string) =>
@@ -156,6 +159,12 @@ export const waha = {
   sendSeen: (session: string, chatId: string) =>
     call("/api/sendSeen", { method: "POST", body: JSON.stringify({ session, chatId }) }).catch(() => null),
 };
+
+/** Baixa um arquivo de mídia do WAHA (a URL do payload aponta para o host interno; usamos só o caminho). */
+export async function fetchWahaFile(path: string) {
+  const { url, key } = await cfg();
+  return fetch(url + path, { headers: key ? { "X-Api-Key": key } : {}, signal: AbortSignal.timeout(30_000) });
+}
 
 export function extractMessageId(res: unknown): string | null {
   const r = res as { id?: unknown; key?: { id?: string } } | null;

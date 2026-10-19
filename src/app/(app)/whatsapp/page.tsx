@@ -309,7 +309,7 @@ function TestMessage({ connected, warmUntil = 0 }: { connected: boolean; warmUnt
           className="grid gap-4"
           onSubmit={async (e) => {
             e.preventDefault();
-            const r = await run(() => api<{ leadId: string }>("/api/whatsapp/send", { body: { phone, text } }), "Mensagem enviada");
+            const r = await run(() => api<{ leadId: string }>("/api/whatsapp/send", { body: { phone, text, humanize: true } }), "Mensagem enviada");
             if (r) setLastLead(r.leadId);
           }}
         >
