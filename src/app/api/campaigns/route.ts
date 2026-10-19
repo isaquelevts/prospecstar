@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { body, route } from "@/lib/api";
 import { defaultSession } from "@/lib/waha";
+import { startOfToday } from "@/lib/template";
 import { CampaignInput } from "@/lib/schemas";
 import { DEFAULT_TEMPLATES } from "@/lib/campaigns";
 
@@ -8,10 +9,12 @@ export const GET = route(async () => {
   const campaigns = await prisma.campaign.findMany({ orderBy: { createdAt: "desc" }, include: { agent: { select: { name: true } } } });
   const stats = await prisma.campaignTarget.groupBy({ by: ["campaignId", "status"], _count: true });
   const replies = await prisma.campaignTarget.groupBy({ by: ["campaignId"], where: { repliedAt: { not: null } }, _count: true });
+  const today = await prisma.campaignTarget.groupBy({ by: ["campaignId"], where: { status: "SENT", sentAt: { gte: startOfToday() } }, _count: true });
   return campaigns.map((c) => {
     const s = Object.fromEntries(stats.filter((x) => x.campaignId === c.id).map((x) => [x.status, x._count]));
     return {
       ...c,
+      sentToday: today.find((t) => t.campaignId === c.id)?._count ?? 0,
       stats: {
         pending: s.PENDING ?? 0,
         sending: s.SENDING ?? 0,

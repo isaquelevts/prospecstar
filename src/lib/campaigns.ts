@@ -7,12 +7,8 @@ import { leadVariables, pick, randomBetween, renderTemplate, TZ } from "./templa
 import { sendToLead } from "./messaging";
 import { getSettings } from "./settings";
 
-/** Mensagens padrão de uma campanha nova: variações + spintax para nenhum lead receber o mesmo texto. */
-export const DEFAULT_TEMPLATES = [
-  "{{saudacao}}, tudo bem? Aqui é o Isaque, do QuadrasFlow. Eu queria falar com o dono da {{nome}} — seria você?",
-  "{{saudacao_informal}}! Tudo bem? Sou o Isaque, do QuadrasFlow. Falo com o responsável pela {{nome}}?",
-  "{{saudacao}}! Aqui é o Isaque, do QuadrasFlow. Estou {conversando com|falando com} {algumas|várias} arenas aqui da região e queria trocar uma ideia rápida com o dono da {{nome}}. É você?",
-];
+import { DEFAULT_TEMPLATES } from "./campaign-defaults";
+export { DEFAULT_TEMPLATES };
 
 /** Quantas falhas seguidas pausam a campanha sozinha (protege o número e a lista). */
 const MAX_FAIL_STREAK = 3;
@@ -20,6 +16,9 @@ const MAX_FAIL_STREAK = 3;
 const MAX_ATTEMPTS = 3;
 /** Não manda para quem recebeu outra campanha nesse período. */
 const OTHER_CAMPAIGN_DAYS = 30;
+
+/** Ordem de envio da fila: quem nunca falhou primeiro, depois a maior temperatura. */
+export const QUEUE_ORDER: Prisma.CampaignTargetOrderByWithRelationInput[] = [{ attempts: "asc" }, { lead: { score: "desc" } }, { id: "asc" }];
 
 const DAY_NAMES = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
@@ -47,7 +46,7 @@ function windowLabel(c: { windowStart: string; windowEnd: string; weekdays: numb
 }
 
 /** Envios de campanha hoje (no fuso configurado); sem campaignId conta todas as campanhas do número. */
-async function sentToday(campaignId?: string) {
+export async function sentToday(campaignId?: string) {
   const rows = campaignId
     ? await prisma.$queryRaw<Array<{ n: bigint }>>`
         SELECT count(*)::bigint AS n FROM "CampaignTarget"
@@ -170,7 +169,7 @@ async function tick(c: Campaign, next: (ms: number, waitReason?: string | null) 
 
   const target = await prisma.campaignTarget.findFirst({
     where: { campaignId, status: "PENDING" },
-    orderBy: [{ attempts: "asc" }, { lead: { score: "desc" } }, { id: "asc" }],
+    orderBy: QUEUE_ORDER,
     include: { lead: true },
   });
   if (!target) {

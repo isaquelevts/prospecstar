@@ -89,7 +89,7 @@ export function Input(p: React.InputHTMLAttributes<HTMLInputElement>) {
   return <ShadInput {...p} />;
 }
 
-export function Textarea(p: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea(p: React.ComponentProps<"textarea">) {
   return <ShadTextarea {...p} className={cn("field-sizing-fixed leading-relaxed", p.className)} />;
 }
 

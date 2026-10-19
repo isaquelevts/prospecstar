@@ -16,5 +16,7 @@ export const POST = route(async (req) => {
   const examples = valid.length
     ? sample.map((lead, i) => ({ lead: lead.name, text: renderTemplate(valid[i % valid.length], leadVariables(lead)) }))
     : [];
-  return { count, examples };
+  // cada variação escrita, renderizada para o primeiro lead (spintax sorteado de novo a cada chamada)
+  const variations = sample[0] ? valid.map((t) => renderTemplate(t, leadVariables(sample[0]))) : [];
+  return { count, examples, variations, sampleLead: sample[0]?.name ?? null };
 });
