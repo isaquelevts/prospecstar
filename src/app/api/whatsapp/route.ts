@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { body, route } from "@/lib/api";
 import { getSettings } from "@/lib/settings";
-import { WEBHOOK_EVENTS, waha } from "@/lib/waha";
+import { WEBHOOK_EVENTS, sessionWarmUntil, waha } from "@/lib/waha";
 import { normalizePhone } from "@/lib/phone";
 
 function webhookUrl(publicUrl: string) {
@@ -26,8 +26,10 @@ export const GET = route(async (req) => {
       const img = await waha.qr(session).catch(() => null);
       if (img?.data) qr = `data:${img.mimetype};base64,${img.data}`;
     }
+    const warmUntil = current?.status === "WORKING" ? await sessionWarmUntil(session) : 0;
     let picture: string | null = null;
-    if (withPicture && current?.status === "WORKING" && current.me?.id) {
+    // a foto exige comandar o WhatsApp Web: só depois que a sessão terminou de sincronizar
+    if (withPicture && current?.status === "WORKING" && !warmUntil && current.me?.id) {
       picture = (await waha.profilePicture(session, current.me.id))?.profilePictureURL ?? null;
     }
     // o webhook está apontando para este sistema e com todos os eventos?
@@ -42,6 +44,7 @@ export const GET = route(async (req) => {
       qr,
       picture,
       webhookOk: current ? webhookOk : null,
+      warmUntil,
       diagnostics,
     };
   } catch (e) {

@@ -127,6 +127,11 @@ async function tick(c: Campaign, next: (ms: number) => Promise<unknown>) {
       await prisma.campaignTarget.update({ where: { id: target.id }, data: { status: "PENDING", error: null } });
       return next(5 * 60_000);
     }
+    // WhatsApp recém-conectado ainda sincronizando: devolve para a fila e tenta daqui a pouco
+    if (msg.includes("ainda está sincronizando")) {
+      await prisma.campaignTarget.update({ where: { id: target.id }, data: { status: "PENDING", error: null } });
+      return next(60_000);
+    }
     return next(randomBetween(c.minDelaySec, c.maxDelaySec) * 1000);
   }
 

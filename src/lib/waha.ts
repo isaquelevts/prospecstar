@@ -1,3 +1,4 @@
+import { prisma } from "./db";
 import { getSettings } from "./settings";
 import { sleep } from "./template";
 
@@ -21,6 +22,8 @@ function friendly(status: number, path: string, text: string) {
   if (status === 401 || status === 403) return "API key do WAHA incorreta (Configurações → WAHA).";
   if (/expected.*WORKING|not as expected|session.*(not found|does not exist)/i.test(text) || (status === 404 && /session/i.test(text)))
     return "WhatsApp não está conectado. Abra a tela WhatsApp e conecte o número.";
+  if (/Execution context was destroyed|browser has been disconnected|Target closed|ProtocolError/i.test(text))
+    return "O WhatsApp Web do servidor está recarregando. Aguarde 1 a 2 minutos e tente de novo.";
   return `WAHA ${status} ${path}: ${text.slice(0, 300)}`;
 }
 
@@ -65,6 +68,41 @@ export type WahaSession = {
 
 export const WEBHOOK_EVENTS = ["message.any", "message.ack", "session.status"];
 
+/**
+ * Logo depois de ler o QR o WhatsApp Web ainda sincroniza e recarrega a página. Um comando nesse intervalo
+ * derruba o navegador do WAHA, e reiniciar uma sessão recém-pareada perde o login. Por isso esperamos.
+ */
+export const WARMUP_MS = 2 * 60_000;
+const warmKey = (session: string) => `WA_WORKING_SINCE:${session}`;
+
+/** Registra quando a sessão ficou WORKING (chamado pelo webhook session.status). */
+export async function markSessionStatus(session: string, status: string | undefined) {
+  if (status === "WORKING") {
+    await prisma.setting.upsert({
+      where: { key: warmKey(session) },
+      create: { key: warmKey(session), value: String(Date.now()) },
+      update: {},
+    });
+  } else if (status) {
+    await prisma.setting.deleteMany({ where: { key: warmKey(session) } });
+  }
+}
+
+/** Momento (ms) em que a sessão termina de aquecer, ou 0 se já pode enviar. */
+export async function sessionWarmUntil(session: string) {
+  const row = await prisma.setting.findUnique({ where: { key: warmKey(session) } });
+  const until = row ? Number(row.value) + WARMUP_MS : 0;
+  return until > Date.now() ? until : 0;
+}
+
+export async function assertSessionReady(session: string) {
+  const until = await sessionWarmUntil(session);
+  if (until) {
+    const secs = Math.ceil((until - Date.now()) / 1000);
+    throw new Error(`WhatsApp acabou de conectar e ainda está sincronizando. Aguarde ${secs}s para enviar.`);
+  }
+}
+
 export const waha = {
   listSessions: () => call<WahaSession[]>("/api/sessions?all=true"),
   getSession: (name: string) => call<WahaSession>(`/api/sessions/${encodeURIComponent(name)}`),
@@ -72,6 +110,8 @@ export const waha = {
   /** Cria (ou atualiza) a sessão com o webhook apontando para este sistema e inicia. */
   async upsertSession(name: string, webhookUrl: string) {
     const config = {
+      // o sistema só conversa no privado: não baixar Status, grupos e canais deixa a sincronização leve
+      ignore: { status: true, groups: true, channels: true, broadcast: true },
       webhooks: [
         {
           url: webhookUrl,

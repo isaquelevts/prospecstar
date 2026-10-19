@@ -46,6 +46,7 @@ type WA = {
   qr?: string | null;
   picture?: string | null;
   webhookOk?: boolean | null;
+  warmUntil?: number;
   error?: string;
   diagnostics: { wahaUrl: string; publicUrl: string; webhookSecret: boolean; apiKey: boolean };
 };
@@ -284,8 +285,15 @@ function Connect({ data, onAction, busy }: { data?: WA; onAction: (a: string, ms
   );
 }
 
-function TestMessage({ connected }: { connected: boolean }) {
+function TestMessage({ connected, warmUntil = 0 }: { connected: boolean; warmUntil?: number }) {
   const [phone, setPhone] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!warmUntil) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [warmUntil]);
+  const warmSecs = warmUntil > now ? Math.ceil((warmUntil - now) / 1000) : 0;
   const [text, setText] = useState("Teste de envio pelo prospec. ✅");
   const [lastLead, setLastLead] = useState<string | null>(null);
   const { run, busy } = useAction();
@@ -316,7 +324,7 @@ function TestMessage({ connected }: { connected: boolean }) {
         </form>
       </CardContent>
       <CardFooter className="flex-wrap gap-2">
-        <Button type="submit" form="test-message" disabled={busy || !connected || phone.replace(/\D/g, "").length < 10 || !text.trim()}>
+        <Button type="submit" form="test-message" disabled={busy || !connected || warmSecs > 0 || phone.replace(/\D/g, "").length < 10 || !text.trim()}>
           {busy ? <LoaderCircle className="animate-spin" /> : <Send />}
           Enviar teste
         </Button>
@@ -326,6 +334,9 @@ function TestMessage({ connected }: { connected: boolean }) {
           </Button>
         )}
         {!connected && <span className="text-muted-foreground text-xs">Conecte o WhatsApp para enviar.</span>}
+        {connected && warmSecs > 0 && (
+          <span className="text-muted-foreground text-xs">Sincronizando o WhatsApp… envio liberado em {warmSecs}s.</span>
+        )}
       </CardFooter>
     </Card>
   );
@@ -464,7 +475,7 @@ export default function WhatsAppPage() {
         </Card>
 
         <div className="grid gap-6">
-          <TestMessage connected={data?.status === "WORKING"} />
+          <TestMessage connected={data?.status === "WORKING"} warmUntil={data?.warmUntil} />
           <Diagnostics data={data} />
           <Tips />
         </div>

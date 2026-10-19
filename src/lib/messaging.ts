@@ -1,7 +1,7 @@
 import type { Lead } from "@prisma/client";
 import { prisma } from "./db";
 import { phoneToChatId } from "./phone";
-import { defaultSession, extractMessageId, sendHumanized, waha } from "./waha";
+import { assertSessionReady, defaultSession, extractMessageId, sendHumanized, waha } from "./waha";
 
 /** Garante que o lead tem WhatsApp e um chatId válido. Retorna null se o número não existir. */
 export async function resolveChatId(lead: Lead, session: string): Promise<string | null> {
@@ -35,6 +35,7 @@ export async function sendToLead(
   const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId } });
   if (lead.optOut && author !== "human") throw new Error("Lead pediu para não receber mensagens (opt-out).");
   const session = opts.session || (await defaultSession());
+  await assertSessionReady(session);
   const chatId = await resolveChatId(lead, session);
   if (!chatId) throw new Error("Número não tem WhatsApp.");
 

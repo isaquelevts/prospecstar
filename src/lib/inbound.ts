@@ -2,7 +2,7 @@ import { prisma } from "./db";
 import { chatIdToPhone, phoneToChatId } from "./phone";
 import { debounceJob } from "./queue";
 import { getSettings } from "./settings";
-import { waha, wahaIdWhere } from "./waha";
+import { markSessionStatus, waha, wahaIdWhere } from "./waha";
 import { addActivity, createLeadIfNew, findLeadByPhone } from "./leads";
 import { fireTrigger, stopRunsForLead } from "./flows";
 import { resolveAgent } from "./ai";
@@ -79,6 +79,7 @@ function messageText(m: WahaMessage) {
 
 export async function handleWahaEvent(evt: WahaEvent) {
   if (evt.event === "message.ack") return handleAck(evt.payload);
+  if (evt.event === "session.status") return markSessionStatus(evt.session, evt.payload?.status);
   if (evt.event !== "message.any" && evt.event !== "message") return;
   const m = evt.payload;
   const chatId = m.fromMe ? m.to : m.from;
