@@ -155,6 +155,10 @@ model Campaign {
   agent         Agent?    @relation(fields: [agentId], references: [id], onDelete: SetNull)
   moveToStageId String?
   tickToken     String?
+  waitReason    String? // o que a campanha está esperando agora (horário, limite, WhatsApp…)
+  nextRunAt     DateTime? // previsão do próximo envio
+  lastError     String?
+  failStreak    Int       @default(0) // falhas seguidas; pausa sozinha ao chegar no limite
   createdAt     DateTime  @default(now())
   startedAt     DateTime?
   finishedAt    DateTime?
@@ -168,6 +172,7 @@ model CampaignTarget {
   leadId     String
   lead       Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
   status     String    @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  attempts   Int       @default(0)
   message    String?
   error      String?
   sentAt     DateTime?

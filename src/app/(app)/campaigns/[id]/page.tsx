@@ -23,6 +23,9 @@ type Campaign = {
   weekdays: number[];
   agentId: string | null;
   moveToStageId: string | null;
+  waitReason?: string | null;
+  nextRunAt?: string | null;
+  lastError?: string | null;
 };
 type Target = { id: string; status: string; sentAt: string | null; repliedAt: string | null; error: string | null; message: string | null; lead: { id: string; name: string; phone: string | null; city: string | null } };
 
@@ -33,7 +36,7 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
   const { id } = use(params);
   const router = useRouter();
   const [tab, setTab] = useState("");
-  const { data, mutate } = useApi<{ campaign: Campaign; targets: Target[] }>(`/api/campaigns/${id}?status=${tab}`, { refreshInterval: 8000 });
+  const { data, mutate } = useApi<{ campaign: Campaign; targets: Target[]; dailyLimitGlobal: number }>(`/api/campaigns/${id}?status=${tab}`, { refreshInterval: 8000 });
   const { data: stages } = useApi<Array<{ id: string; name: string }>>("/api/stages");
   const { data: agents } = useApi<Array<{ id: string; name: string }>>("/api/agents");
   const { data: all } = useApi<Array<{ id: string; stats: Record<string, number> }>>("/api/campaigns", { refreshInterval: 8000 });
@@ -71,10 +74,20 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
     }, "Campanha salva");
 
   const action = async (a: string, msg: (r: any) => string) => {
-    if (a === "start") await save();
+    if (a === "start") {
+      if (status === "DRAFT") {
+        const n = preview?.count ?? 0;
+        if (!n) return alert("Nenhum lead bate com o filtro. Ajuste “Quem vai receber” antes de iniciar.");
+        if (!confirm(`Iniciar disparos para ${n} lead${n > 1 ? "s" : ""}?\n\nUma mensagem por vez, entre ${c.minDelaySec}s e ${c.maxDelaySec}s de intervalo, até ${c.dailyLimit} por dia.`)) return;
+      }
+      await save();
+    }
     await run(() => api(`/api/campaigns/${id}`, { body: { action: a } }), msg);
     mutate();
   };
+  const live = data.campaign;
+  const nextAt = live.nextRunAt ? new Date(live.nextRunAt) : null;
+  const nextLabel = nextAt && nextAt.getTime() > Date.now() ? nextAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null;
 
   return (
     <>
@@ -99,13 +112,28 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
                 Pausar
               </Button>
             ) : (
-              <Button disabled={busy || status === "DONE"} onClick={() => action("start", () => "Disparos iniciados")}>
+              <Button disabled={busy || status === "DONE"} onClick={() => action("start", (r) => (r.added ? `Disparos iniciados para ${r.pending} leads` : "Disparos iniciados"))}>
                 {status === "PAUSED" ? "Retomar" : "Iniciar disparos"}
               </Button>
             )}
           </>
         }
       />
+
+      {running && (
+        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg border border-cobalt/30 bg-cobalt-soft px-4 py-3 text-sm">
+          <span className="size-2 animate-pulse rounded-full bg-cobalt" />
+          <span className="font-medium">{live.waitReason ?? (nextLabel ? `Próximo envio por volta das ${nextLabel}` : "Enviando…")}</span>
+          {live.waitReason && nextLabel && <span className="text-mute">· verifica de novo às {nextLabel}</span>}
+        </div>
+      )}
+      {!running && live.lastError && (
+        <div className="mb-6 rounded-lg border border-bad/30 bg-bad-soft px-4 py-3 text-sm text-bad">
+          <p className="font-medium">{status === "PAUSED" ? "Campanha pausada" : "Último erro"}</p>
+          <p className="mt-0.5 break-words">{live.lastError}</p>
+          {status === "PAUSED" && <p className="mt-1 text-xs">Confira a tela WhatsApp e clique em Retomar.</p>}
+        </div>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <div className="space-y-6">
@@ -213,7 +241,8 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
             </div>
             <div className="mt-5 flex flex-wrap items-center gap-3 rounded-lg bg-paper px-4 py-3 text-sm">
               <span>
-                <strong className="font-display text-lg">{preview?.count ?? "…"}</strong> leads com WhatsApp batem com o filtro
+                <strong className="font-display text-lg">{preview?.count ?? "…"}</strong> leads podem receber
+                <span className="block text-xs text-mute">com WhatsApp, sem descadastro e que ainda não conversam com você{status === "DRAFT" ? " — entram na fila ao iniciar" : ""}</span>
               </span>
               <Button
                 size="sm"
@@ -225,7 +254,7 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
                   await action("populate", (r) => `${r.added} leads adicionados à fila`);
                 }}
               >
-                Adicionar à fila da campanha
+                {status === "DRAFT" ? "Adicionar à fila agora" : "Adicionar novos leads à fila"}
               </Button>
             </div>
           </Card>
@@ -244,7 +273,7 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
               )}
             </div>
             {data.targets.length === 0 ? (
-              <p className="p-6 text-center text-sm text-mute">Nenhum lead na fila. Ajuste o filtro e clique em “Adicionar à fila da campanha”.</p>
+              <p className="p-6 text-center text-sm text-mute">Nenhum lead na fila ainda. Ao clicar em “Iniciar disparos”, os leads do filtro entram automaticamente.</p>
             ) : (
               <ul className="divide-y divide-line text-sm">
                 {data.targets.map((t) => (
@@ -281,7 +310,10 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
                 <Input type="time" value={c.windowEnd} onChange={(e) => set({ windowEnd: e.target.value })} />
               </Field>
             </div>
-            <Field label="Limite por dia" hint="Números novos: comece com 20–40/dia e aumente aos poucos.">
+            <Field
+              label="Limite por dia"
+              hint={`Números novos: comece com 20–40/dia e aumente aos poucos. O número envia no máximo ${data.dailyLimitGlobal}/dia somando todas as campanhas (Configurações → Disparos).`}
+            >
               <Input type="number" min={1} value={c.dailyLimit} onChange={(e) => set({ dailyLimit: Number(e.target.value) })} />
             </Field>
             <div className="flex flex-wrap gap-1">

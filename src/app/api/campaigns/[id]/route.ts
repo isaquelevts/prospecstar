@@ -2,19 +2,19 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { body, route } from "@/lib/api";
 import { CampaignInput } from "@/lib/schemas";
-import { pauseCampaign, populateTargets, startCampaign } from "@/lib/campaigns";
-import { buildLeadWhere } from "@/lib/leads";
+import { campaignAudienceWhere, globalDailyLimit, pauseCampaign, populateTargets, startCampaign } from "@/lib/campaigns";
 
 export const GET = route<{ id: string }>(async (req, { id }) => {
   const status = new URL(req.url).searchParams.get("status") || undefined;
   const campaign = await prisma.campaign.findUniqueOrThrow({ where: { id } });
+  const dailyLimitGlobal = await globalDailyLimit();
   const targets = await prisma.campaignTarget.findMany({
     where: { campaignId: id, ...(status ? { status } : {}) },
     orderBy: [{ sentAt: "desc" }, { id: "asc" }],
     take: 300,
     include: { lead: { select: { id: true, name: true, phone: true, city: true } } },
   });
-  return { campaign, targets };
+  return { campaign, targets, dailyLimitGlobal };
 });
 
 export const PATCH = route<{ id: string }>(async (req, { id }) => {
@@ -35,17 +35,20 @@ export const POST = route<{ id: string }>(async (req, { id }) => {
     case "count":
       return {
         count: await prisma.lead.count({
-          where: { ...buildLeadWhere(c.filter as object), optOut: false, phone: { not: null }, waExists: { not: false } },
+          where: campaignAudienceWhere(c.filter as object),
         }),
       };
     case "populate":
       return { added: await populateTargets(id, c.filter as object) };
     case "start": {
-      const pending = await prisma.campaignTarget.count({ where: { campaignId: id, status: "PENDING" } });
-      if (!pending) throw new Error("Nenhum lead pendente. Adicione leads à campanha primeiro.");
       if (!c.templates.some((t) => t.trim())) throw new Error("Adicione pelo menos uma mensagem.");
+      // sem fila ainda: adiciona automaticamente quem bate com o filtro
+      let added = 0;
+      if (c.status === "DRAFT") added = await populateTargets(id, c.filter as object);
+      const pending = await prisma.campaignTarget.count({ where: { campaignId: id, status: "PENDING" } });
+      if (!pending) throw new Error("Nenhum lead para receber. Ajuste o filtro em “Quem vai receber”.");
       await startCampaign(id);
-      return { ok: true };
+      return { ok: true, added, pending };
     }
     case "pause":
       await pauseCampaign(id);

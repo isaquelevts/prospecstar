@@ -11,29 +11,22 @@ type Campaign = {
   name: string;
   status: string;
   dailyLimit: number;
+  waitReason?: string | null;
+  lastError?: string | null;
   agent: { name: string } | null;
   stats: { pending: number; sending: number; sent: number; failed: number; skipped: number; replied: number };
 };
 
 
 export default function CampaignsPage() {
-  const { data } = useApi<Campaign[]>("/api/campaigns", { refreshInterval: 10_000 });
+  const { data, mutate } = useApi<Campaign[]>("/api/campaigns", { refreshInterval: 10_000 });
   const router = useRouter();
   const { run, busy } = useAction();
   const [recipientsCampaign, setRecipientsCampaign] = useState<Campaign | null>(null);
 
   async function create() {
-    const c = await run(() =>
-      api<{ id: string }>("/api/campaigns", {
-        body: {
-          name: `Campanha ${new Date().toLocaleDateString("pt-BR")}`,
-          templates: [
-            "{{saudacao}}, tudo bem? Vi a {{nome}} no Google e {achei muito bem avaliada|gostei das avaliações de vocês}! Notei que vocês ainda não têm um site próprio. Posso te mostrar em 2 minutos como um site pode trazer mais clientes pra vocês?",
-          ],
-          filter: { websiteStatus: ["NONE", "SOCIAL_ONLY", "OFFLINE"], neverContacted: true },
-        },
-      }),
-    );
+    // o servidor preenche nome, mensagens e filtro padrão (e reaproveita um rascunho vazio)
+    const c = await run(() => api<{ id: string }>("/api/campaigns", { body: {} }));
     if (c) router.push(`/campaigns/${c.id}`);
   }
 
@@ -78,12 +71,29 @@ export default function CampaignsPage() {
                       </div>
                     ))}
                   </div>
+                  {c.status === "RUNNING" && c.waitReason && <p className="mt-3 text-xs text-cobalt">{c.waitReason}</p>}
+                  {c.status === "PAUSED" && c.lastError && <p className="mt-3 line-clamp-2 text-xs text-bad" title={c.lastError}>{c.lastError}</p>}
                   <p className="mt-3 text-xs text-mute">
                     {c.dailyLimit}/dia{c.agent ? ` · respostas com ${c.agent.name}` : " · sem IA nas respostas"}
                   </p>
                   <Button size="sm" variant="outline" className="mt-3 w-full" onClick={() => setRecipientsCampaign(c)}>
                     Ver destinatários ({pending})
                   </Button>
+                  {c.status !== "RUNNING" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="mt-1 w-full text-bad"
+                      disabled={busy}
+                      onClick={async () => {
+                        if (!confirm(`Excluir "${c.name}"? O histórico de mensagens dos leads é mantido.`)) return;
+                        await run(() => api(`/api/campaigns/${c.id}`, { method: "DELETE" }), "Campanha excluída");
+                        mutate();
+                      }}
+                    >
+                      Excluir
+                    </Button>
+                  )}
               </Card>
             );
           })}

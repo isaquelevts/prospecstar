@@ -2,9 +2,32 @@ import type { Lead } from "@prisma/client";
 
 export const TZ = process.env.TZ || "America/Sao_Paulo";
 
+const SMALL_WORDS = new Set(["de", "da", "do", "das", "dos", "e", "em", "na", "no", "para"]);
+
+/**
+ * Nome como uma pessoa escreveria: tira o que vem depois de " - " ou " | " (sufixos do Google)
+ * e desfaz o CAIXA ALTA ("ARENA CHOPP & BOLÃO" → "Arena Chopp & Bolão"). Palavras com números ficam como estão.
+ */
+export function friendlyName(raw: string) {
+  let name = raw.split(/\s+[-–—|•]\s+/)[0].replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const letters = name.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, "");
+  const upper = letters.replace(/[^A-ZÀ-ÖØ-Þ]/g, "").length;
+  if (letters.length >= 4 && upper / letters.length > 0.8) {
+    name = name
+      .split(/(\s+)/)
+      .map((w, i) => {
+        if (!w.trim() || /\d/.test(w)) return w;
+        const lower = w.toLocaleLowerCase("pt-BR");
+        return i > 0 && SMALL_WORDS.has(lower) ? lower : lower.charAt(0).toLocaleUpperCase("pt-BR") + lower.slice(1);
+      })
+      .join("");
+  }
+  return name || raw.trim();
+}
+
 export function leadVariables(lead: Partial<Lead>): Record<string, string> {
   const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: TZ }).format(new Date()));
-  const name = lead.name ?? "";
+  const name = friendlyName(lead.name ?? "");
   return {
     nome: name,
     primeiro_nome: name.split(/\s+/)[0] ?? name,

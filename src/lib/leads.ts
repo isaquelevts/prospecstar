@@ -55,7 +55,8 @@ export async function createLeadIfNew(
       phone,
       email: input.email || null,
       website: input.website || null,
-      websiteStatus: input.website ? null : "NONE",
+      // "sem site" só faz sentido para empresas vindas da busca; contatos do WhatsApp/manuais ficam sem status
+      websiteStatus: input.website || opts.source !== "scraper" ? null : "NONE",
       address: input.address || null,
       city: input.city || null,
       state: input.state || null,
